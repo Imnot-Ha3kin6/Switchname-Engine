@@ -22,12 +22,14 @@
 - **Video cutscenes** through FFmpeg (replaces hxvlc/libVLC).
 - **Switch options**: screen-effect resolution, botplay, stick dead zone, and per-mod custom-menu toggles.
 - **Compatibility fixes for older mods**: fallbacks for classes that moved between Codename versions, older Animate-atlas symbols, and more.
-- **OpenGL fallback build**: `SwitchnameEngine-GL.nro`, using Mesa, can be built from source in case the deko3d build has trouble with a mod.
+- **OpenGL fallback build**: `SwitchnameEngine-GL.nro`, using Mesa, in case the deko3d build has trouble with a mod.
 
 ## Installing
 
-1. Download `SwitchnameEngine.nro` from the [latest release](https://github.com/Imnot-Ha3kin6/Switchname-Engine/releases/latest).
-2. Copy it to `sdmc:/switch/` on your SD card.
+1. Download from the [latest release](https://github.com/Imnot-Ha3kin6/Switchname-Engine/releases/latest):
+   - `SwitchnameEngine.nro` is the main build, using the native deko3d renderer. It's the fastest, especially with shaders. It shows up in the homebrew menu as **Switchname Engine**.
+   - `SwitchnameEngine-GL.nro` is the OpenGL (Mesa) fallback build, for when a mod looks wrong on the main build. It shows up as **Switchname Engine (OpenGL)**.
+2. Copy one or both to `sdmc:/switch/` on your SD card. They can be installed side by side and share the same mods folder.
 3. Put your mods in `sdmc:/switch/CodenameEngine/mods/` and addons in `sdmc:/switch/CodenameEngine/addons/`.
 4. Launch it from the homebrew menu in **full-memory mode**: hold **R** while opening a game, or use a forwarder. Applet mode (the Album) does not have enough memory.
 

@@ -196,17 +196,33 @@ static void textureAllocate(Texture& t, uint32_t lw, uint32_t lh, const FmtInfo&
 	bool same = t.valid && t.width == w && t.height == h && t.dkFormat == f.dk && t.mipLevels == levels && t.div == div;
 	if (!same) {
 		if (t.valid) blockDestroyDeferred(t.mem);
-		DkImageLayoutMaker m;
-		dkImageLayoutMakerDefaults(&m, ctx.device);
-		m.flags = DkImageFlags_UsageRender;   // no HwCompression: it pads/aligns every texture heavily
-		m.format = f.dk;
-		m.dimensions[0] = w ? w : 1;
-		m.dimensions[1] = h ? h : 1;
-		m.mipLevels = levels;
-		dkImageLayoutInitialize(&t.layout, &m);
-		t.mem = blockCreate((uint32_t)dkImageLayoutGetSize(&t.layout), DkMemBlockFlags_GpuCached | DkMemBlockFlags_Image);
-		dkImageInitialize(&t.image, &t.layout, t.mem.mem, 0);
-		t.valid = t.mem.mem != nullptr;
+		t.valid = false;
+		auto tryAlloc = [&](uint32_t aw, uint32_t ah, uint32_t al) {
+			DkImageLayoutMaker m;
+			dkImageLayoutMakerDefaults(&m, ctx.device);
+			m.flags = DkImageFlags_UsageRender;   // no HwCompression: it pads/aligns every texture heavily
+			m.format = f.dk;
+			m.dimensions[0] = aw ? aw : 1;
+			m.dimensions[1] = ah ? ah : 1;
+			m.mipLevels = al;
+			dkImageLayoutInitialize(&t.layout, &m);
+			t.mem = blockCreate((uint32_t)dkImageLayoutGetSize(&t.layout), DkMemBlockFlags_GpuCached | DkMemBlockFlags_Image);
+			return t.mem.mem != nullptr;
+		};
+		bool ok = tryAlloc(w, h, levels);
+		if (!ok && levels > 1) { levels = 1; ok = tryAlloc(w, h, 1); }          // drop the mip chain first
+		if (!ok && div == 1 && f.bpp == 4 && (lw > 1 || lh > 1)) {               // then store at half resolution
+			div = 2; w = (lw + 1) / 2; h = (lh + 1) / 2;
+			ok = tryAlloc(w, h, 1);
+			if (ok) logf("dkgl: low memory, %ux%u texture stored at half resolution", lw, lh);
+		}
+		if (!ok) {   // last resort: a 1x1 placeholder so the game keeps running instead of crashing
+			logf("dkgl: out of memory for a %ux%u texture, using a placeholder", lw, lh);
+			div = 1; w = h = 1; levels = 1;
+			ok = tryAlloc(1, 1, 1);
+		}
+		if (ok) dkImageInitialize(&t.image, &t.layout, t.mem.mem, 0);
+		t.valid = ok;
 		t.width = w; t.height = h;
 		t.dkFormat = f.dk;
 		t.mipLevels = levels;
@@ -911,6 +927,9 @@ GLF void gl_TexImage2D(GLenum target, GLint level, GLint, GLsizei w, GLsizei h, 
 	// giant images (6144+ px, e.g. 8192x8192 character sheets) are stored at half resolution: 4x less memory
 	// and upload work. Render targets (no pixel data) keep their full size.
 	uint32_t div = (pixels && f.bpp == 4 && (w >= 6144 || h >= 6144)) ? 2 : 1;
+	// re-created at the same size without pixels (OpenFL re-allocating a giant image): keep the half-size storage
+	// instead of asking for a full-size copy (200+ MB) that may not exist
+	if (!pixels && f.bpp == 4 && t->valid && t->div == 2 && t->width == (uint32_t)(w + 1) / 2 && t->height == (uint32_t)(h + 1) / 2) div = 2;
 	if (div == 2 && (t->div != 2 || t->width != (uint32_t)(w + 1) / 2)) logf("dkgl: %dx%d texture stored at half resolution", w, h);
 	textureAllocate(*t, w, h, f, div);
 	textureUpload(*t, 0, 0, w, h, format, f, pixels);
@@ -1244,7 +1263,8 @@ GLF void gl_RenderbufferStorage(GLenum, GLenum fmt, GLsizei w, GLsizei h)
 	m.dimensions[1] = h ? h : 1;
 	dkImageLayoutInitialize(&r.layout, &m);
 	r.mem = blockCreate((uint32_t)dkImageLayoutGetSize(&r.layout), DkMemBlockFlags_GpuCached | DkMemBlockFlags_Image);
-	dkImageInitialize(&r.image, &r.layout, r.mem.mem, 0);
+	if (r.mem.mem) dkImageInitialize(&r.image, &r.layout, r.mem.mem, 0);
+	else logf("dkgl: out of memory for a %dx%d renderbuffer", w, h);
 	r.valid = r.mem.mem != nullptr;
 	r.width = w; r.height = h;
 	S.targetsDirty = true;
@@ -1279,6 +1299,7 @@ GLF void gl_ReadPixels(GLint x, GLint y, GLsizei w, GLsizei h, GLenum format, GL
 	if (rh < 1) rh = 1;
 	uint32_t row = (uint32_t)rw * 4;
 	Block tmp = blockCreate(row * rh, DkMemBlockFlags_CpuUncached | DkMemBlockFlags_GpuCached);
+	if (!tmp.mem) { logf("dkgl: out of memory for glReadPixels %dx%d", rw, rh); return; }
 	DkImageView view;
 	dkImageViewDefaults(&view, img);
 	DkImageRect rect = { (uint32_t)rx, (uint32_t)ry, 0, (uint32_t)rw, (uint32_t)rh, 1 };
