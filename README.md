@@ -29,7 +29,7 @@
 
 ## Installing
 
-1. Download from the [latest release](https://github.com/Imnot-Ha3kin6/Switchname-Engine/releases/latest):
+1. Download from the [releases page](https://github.com/Imnot-Ha3kin6/Switchname-Engine/releases):
    - `SwitchnameEngine.nro` is the main build, using the native deko3d renderer. It's the fastest, especially with shaders. It shows up in the homebrew menu as **Switchname Engine**.
    - `SwitchnameEngine-GL.nro` is the OpenGL (Mesa) fallback build, for when a mod looks wrong on the main build. It shows up as **Switchname Engine (OpenGL)**.
 2. Copy one or both to `sdmc:/switch/` on your SD card. They can be installed side by side and share the same mods folder.
