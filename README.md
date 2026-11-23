@@ -84,7 +84,13 @@ Then point the core libraries at the exact commits this port was made against, a
 | flixel | [CodenameCrew/cne-flixel](https://github.com/CodenameCrew/cne-flixel) @ `e05b0d0a` | `flixel.patch` |
 | flixel-animate | [CodenameCrew/cne-flixel-animate](https://github.com/CodenameCrew/cne-flixel-animate) @ `49cd4753` | `flixel-animate.patch` |
 
-`lime-nx.patch` is for reference only. The Switch platform code from [Slushi-Github/lime-nx](https://github.com/Slushi-Github/lime-nx) @ `e19e2d4e` is already built into the patched lime `tools.n`.
+**lime-nx is also required.** Clone [Slushi-Github/lime-nx](https://github.com/Slushi-Github/lime-nx) @ `e19e2d4e` into a folder named `lime-nx` **next to** this repo, then apply `lime-nx.patch`. The Switch build uses its `templates/` folder through `../lime-nx/templates` in `project.xml`. Its Switch platform tool code is already built into the patched lime `tools.n`.
+
+```
+some-folder/
+  Switchname-Engine/   <- this repo
+  lime-nx/             <- lime-nx @ e19e2d4e + patches/lime-nx.patch
+```
 
 Example for one library:
 
@@ -135,6 +141,10 @@ The output is `export/release-dk/switch/bin/SwitchnameEngine.nro`.
 
 - If you leave out `-Dswitch_deko3d` and `CNE_GL_LIBS`, you get the Mesa/OpenGL build instead (`export/release/switch/bin/SwitchnameEngine-GL.nro`).
 - If only native libraries changed, delete the `.elf` in the `bin` folder to force a relink.
+
+## PC builds
+
+This repo still builds for PC (Windows, Linux, macOS) like normal Codename Engine, with everything included: **hxvlc video cutscenes**, Discord Rich Presence, and the rest of the libraries that stripped-down custom builds often leave out. The Switch-only parts (`source-switch/`, the deko3d renderer, SD card paths) only apply when building for `switch`. For PC, follow [building/README.md](building/README.md).
 
 ## Project layout
 
