@@ -1,0 +1,264 @@
+diff --git a/assets/templates/haxe/ApplicationMain.hx b/assets/templates/haxe/ApplicationMain.hx
+index 1718d5e8b..b0c9d6b51 100644
+--- a/assets/templates/haxe/ApplicationMain.hx
++++ b/assets/templates/haxe/ApplicationMain.hx
+@@ -140,16 +140,21 @@ class ApplicationMain
+ 
+ 	public static function start(stage:openfl.display.Stage):Void
+ 	{
++		#if switch bootLog('ApplicationMain.start entered'); #end
+ 		if (stage.__uncaughtErrorEvents.__enabled)
+ 		{
+ 			try
+ 			{
+ 				ApplicationMain.getEntryPoint();
++				#if switch bootLog('entry point constructed'); #end
+ 
+ 				stage.loaderInfo.dispatchEvent(new openfl.events.Event(openfl.events.Event.INIT));
++				#if switch bootLog('loader INIT dispatched'); #end
+ 				stage.loaderInfo.dispatchEvent(new openfl.events.Event(openfl.events.Event.COMPLETE));
++				#if switch bootLog('loader COMPLETE dispatched'); #end
+ 
+ 				stage.dispatchEvent(new openfl.events.Event(openfl.events.Event.RESIZE, false, false));
++				#if switch bootLog('stage RESIZE dispatched'); #end
+ 
+ 				if (stage.window.fullscreen)
+ 				{
+@@ -158,6 +163,7 @@ class ApplicationMain
+ 			}
+ 			catch (e:Dynamic)
+ 			{
++				#if switch bootLog('ApplicationMain.start caught: ' + Std.string(e)); #end
+ 				#if !display
+ 				stage.__handleError(e);
+ 				#end
+@@ -166,18 +172,31 @@ class ApplicationMain
+ 		else
+ 		{
+ 			ApplicationMain.getEntryPoint();
++				#if switch bootLog('entry point constructed'); #end
+ 
+ 			stage.loaderInfo.dispatchEvent(new openfl.events.Event(openfl.events.Event.INIT));
++				#if switch bootLog('loader INIT dispatched'); #end
+ 			stage.loaderInfo.dispatchEvent(new openfl.events.Event(openfl.events.Event.COMPLETE));
++				#if switch bootLog('loader COMPLETE dispatched'); #end
+ 
+ 			stage.dispatchEvent(new openfl.events.Event(openfl.events.Event.RESIZE, false, false));
++				#if switch bootLog('stage RESIZE dispatched'); #end
+ 
+ 			if (stage.window.fullscreen)
+ 			{
+ 				stage.dispatchEvent(new openfl.events.FullScreenEvent(openfl.events.FullScreenEvent.FULL_SCREEN, false, false, true, true));
+ 			}
+ 		}
++		#if switch bootLog('ApplicationMain.start complete'); #end
+ 	}
++	#if switch
++	private static function bootLog(message:String):Void
++	{
++		var output = sys.io.File.append('sdmc:/switch/cne-port-boot.log', false);
++		output.writeString(message + '\n');
++		output.close();
++	}
++	#end
+ 	#end
+ 
+ 	macro public static function getEntryPoint()
+diff --git a/src/openfl/CneBootLog.hx b/src/openfl/CneBootLog.hx
+new file mode 100644
+index 000000000..0a8af1a3c
+--- /dev/null
++++ b/src/openfl/CneBootLog.hx
+@@ -0,0 +1,53 @@
++package openfl;
++
++// Temporary Switch diagnostics.
++#if switch
++@:cppFileCode('extern "C" void cne_mem_info(unsigned long long *used, unsigned long long *total);')
++#end
++class CneBootLog
++{
++	static var counts:Map<String, Int> = new Map();
++
++	public static function log(tag:String, ?limit:Int = 2):Void
++	{
++		#if switch
++		var c = counts.exists(tag) ? counts.get(tag) : 0;
++		if (c >= limit) return;
++		counts.set(tag, c + 1);
++		try
++		{
++			var out = sys.io.File.append("sdmc:/switch/cne-port-boot.log", false);
++			out.writeString("haxe " + tag + "\n");
++			out.close();
++		}
++		catch (e:Dynamic) {}
++		#end
++	}
++
++	/** "used/total MB" for this process on Switch. */
++	public static function mem():String
++	{
++		#if switch
++		var used:Float = 0, total:Float = 0;
++		untyped __cpp__("unsigned long long u = 0, t = 0; cne_mem_info(&u, &t); {0} = (double)u; {1} = (double)t", used, total);
++		return Std.int(used / 1048576) + "/" + Std.int(total / 1048576) + " MB";
++		#else
++		return "n/a";
++		#end
++	}
++
++	/** Append one line to sdmc:/switch/cne-trace.log (no rate limit). */
++	public static function trace(msg:String):Void
++	{
++		#if switch
++		try
++		{
++			var out = sys.io.File.append("sdmc:/switch/cne-trace.log", false);
++			out.writeString(msg + "
++");
++			out.close();
++		}
++		catch (e:Dynamic) {}
++		#end
++	}
++}
+diff --git a/src/openfl/display/BitmapData.hx b/src/openfl/display/BitmapData.hx
+index 214551845..0bd6f2563 100644
+--- a/src/openfl/display/BitmapData.hx
++++ b/src/openfl/display/BitmapData.hx
+@@ -2356,7 +2356,19 @@ class BitmapData implements IBitmapDrawable
+ 			}
+ 			#end
+ 
++			#if switch
++			var cneBig = width * height >= 2048 * 2048;
++			if (cneBig) while (context.gl.getError() != 0) {} // drop errors left by earlier GL calls
++			#end
+ 			__texture.__uploadFromImage(textureImage);
++			#if switch
++			if (cneBig)
++			{
++				var gl = context.gl;
++				var err = gl.getError();
++				if (err != 0) openfl.CneBootLog.trace("[tex] upload of " + width + "x" + height + " failed, GL error " + err + " mem=" + openfl.CneBootLog.mem());
++			}
++			#end
+ 
+ 			__textureVersion = image.version;
+ 
+@@ -3304,14 +3316,30 @@ class BitmapData implements IBitmapDrawable
+ 			}
+ 			#end
+ 
++			#if switch
++			var cneBig = width * height >= 2048 * 2048;
++			if (cneBig) while (context.gl.getError() != 0) {}
++			#end
+ 			__texture.__uploadFromImage(image);
+ 			__textureVersion = image.version;
+ 			__textureWidth = image.buffer.width;
+ 			__textureHeight = image.buffer.height;
+ 			__surface = null;
++			#if switch
++			if (cneBig) { var err = context.gl.getError(); if (err != 0) openfl.CneBootLog.trace("[tex] toHardware " + width + "x" + height + " failed, GL error " + err); }
++			#end
+ 
+ 			readable = false;
+ 			image = null;
++
++			#if switch
++			// Switch: free the (often 100+ MB) decoded CPU copy now instead of whenever the GC next runs,
++			// so loading a stage full of huge textures doesn't stack them up and run out of memory
++			if (cneBig)
++			{
++				cpp.vm.Gc.run(true);
++			}
++			#end
+ 		}
+ 	}
+ 
+@@ -3453,9 +3481,12 @@ class BitmapData implements IBitmapDrawable
+ 		var cacheRTTAntiAlias = context.__state.renderToTextureAntiAlias;
+ 		var cacheRTTSurfaceSelector = context.__state.renderToTextureSurfaceSelector;
+ 
++		openfl.CneBootLog.log("drawGL: begin " + width + "x" + height + " src=" + source.__drawableType, 3);
+ 		context.setRenderToTexture(getTexture(context), true);
++		openfl.CneBootLog.log("drawGL: setRenderToTexture done", 3);
+ 
+ 		renderer.__render(source);
++		openfl.CneBootLog.log("drawGL: render done", 3);
+ 
+ 		if (cacheRTT != null)
+ 		{
+diff --git a/src/openfl/display/DisplayObjectRenderer.hx b/src/openfl/display/DisplayObjectRenderer.hx
+index 71b05aee6..927d49469 100644
+--- a/src/openfl/display/DisplayObjectRenderer.hx
++++ b/src/openfl/display/DisplayObjectRenderer.hx
+@@ -45,6 +45,13 @@ class DisplayObjectRenderer extends EventDispatcher
+ 	@SuppressWarnings("checkstyle:Dynamic") @:noCompletion private var __context:#if lime RenderContext #else Dynamic #end;
+ 	@:noCompletion private var __overrideBlendMode:BlendMode;
+ 	@:noCompletion private var __pixelRatio:Float;
++
++	/**
++	 * Resolution (0..1) used for objects with filters, e.g. cameras with full-screen shaders.
++	 * Their offscreen render target is scaled by this and stretched back, so every filter shader
++	 * processes fewer pixels. 1 = full resolution. Set by Codename's "Screen Effects Resolution" option.
++	 */
++	public static var filterResolution:Float = 1;
+ 	@:noCompletion private var __roundPixels:Bool;
+ 	@:noCompletion private var __stage:Stage;
+ 	@:noCompletion private var __tempColorTransform:ColorTransform;
+@@ -382,10 +389,12 @@ class DisplayObjectRenderer extends EventDispatcher
+ 			var offsetX = 0., offsetY = 0.;
+ 
+ 			#if (openfl_disable_hdpi || openfl_disable_hdpi_cacheasbitmap)
+-			var pixelRatio = 1;
++			var pixelRatio:Float = 1;
+ 			#else
+-			var pixelRatio = __pixelRatio;
++			var pixelRatio:Float = __pixelRatio;
+ 			#end
++			if (filterResolution < 1 && displayObject.__filters != null && displayObject.__filters.length > 0)
++				pixelRatio *= filterResolution;
+ 
+ 			if (updateTransform || needRender)
+ 			{
+diff --git a/src/openfl/display3D/Context3D.hx b/src/openfl/display3D/Context3D.hx
+index 89d5c0b87..500044e6e 100644
+--- a/src/openfl/display3D/Context3D.hx
++++ b/src/openfl/display3D/Context3D.hx
+@@ -405,7 +405,7 @@ import lime.math.Vector2;
+ 		{
+ 			TextureBase.__textureInternalFormat = gl.RGBA;
+ 
+-			#if desktop
++			#if (desktop || switch) // Switch runs desktop OpenGL (Mesa); Cairo draws text in BGRA, so keep images BGRA like desktop
+ 			TextureBase.__supportsBGRA = true;
+ 			TextureBase.__textureFormat = 0x80E1/*BGRA*/;
+ 			#elseif mobile
+diff --git a/src/openfl/net/SharedObject.hx b/src/openfl/net/SharedObject.hx
+index eba62e43d..67c8c7978 100644
+--- a/src/openfl/net/SharedObject.hx
++++ b/src/openfl/net/SharedObject.hx
+@@ -863,7 +863,7 @@ class SharedObject extends EventDispatcher
+ 	@:noCompletion private static function __getPath(localPath:String, name:String):String
+ 	{
+ 		#if lime
+-		var path = System.applicationStorageDirectory + "/" + localPath + "/";
++		var path = haxe.io.Path.addTrailingSlash(System.applicationStorageDirectory) + localPath + "/";
+ 
+ 		name = StringTools.replace(name, "//", "/");
+ 		name = StringTools.replace(name, "//", "/");
+@@ -901,6 +901,11 @@ class SharedObject extends EventDispatcher
+ 	{
+ 		// TODO: Move this to Lime somewhere?
+ 
++		#if switch
++		// device paths like "sdmc:/..." break the cwd juggling below; createDirectory makes parents itself
++		sys.FileSystem.createDirectory(directory);
++		return;
++		#end
+ 		#if sys
+ 		directory = StringTools.replace(directory, "\\", "/");
+ 		var total = "";

@@ -29,11 +29,12 @@ class ModsFolder {
 	/**
 	 * Path to the `mods` folder.
 	 */
-	public static var modsPath:String = "./mods/";
+	// The working directory on Switch is the read-only RomFS, so mods live on the SD card.
+	public static var modsPath:String = #if switch "sdmc:/switch/CodenameEngine/mods/" #else "./mods/" #end;
 	/**
 	 * Path to the `addons` folder.
 	 */
-	public static var addonsPath:String = "./addons/";
+	public static var addonsPath:String = #if switch "sdmc:/switch/CodenameEngine/addons/" #else "./addons/" #end;
 
 	/**
 	 * If accessing a file as assets/data/global/LIB_mymod.hx should redirect to mymod:assets/data/global.hx

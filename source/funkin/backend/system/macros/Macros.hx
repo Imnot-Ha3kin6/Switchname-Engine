@@ -39,7 +39,7 @@ class Macros {
 			"foxlite.stencil", "foxlite.system", "foxlite.texture",
 			#end
 			#end
-			#if VIDEO_CUTSCENES "hxvlc.flixel", "hxvlc.openfl", #end
+			#if switch "hxvlc.flixel", "hxvlc.util", /* FFmpeg video player from source-switch */ #elseif VIDEO_CUTSCENES "hxvlc.flixel", "hxvlc.openfl", #end
 			#if NAPE_ENABLED "nape", "flixel.addons.nape", #end
 			#if IMGUI_ENABLED "lime.tools.imgui", #end
 			// BASE HAXE

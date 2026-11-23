@@ -20,6 +20,7 @@ import flixel.graphics.frames.FlxFrame;
 import flixel.math.FlxAngle;
 import animate.internal.RenderTexture;
 import animate.FlxAnimateFrames;
+import flixel.graphics.frames.FlxFramesCollection;
 import funkin.backend.system.FakeCamera;
 
 enum abstract XMLAnimType(Int)
@@ -144,6 +145,32 @@ class FunkinSprite extends FlxAnimate implements IBeatReceiver implements IOffse
 	override function initVars() {
 		super.initVars();
 		_rect2 = FlxRect.get();
+	}
+
+	override function set_frames(frames:FlxFramesCollection):FlxFramesCollection
+	{
+		var result = super.set_frames(frames);
+		legacyFlxAnimateDraw = isAnimate && Flags.USE_LEGACY_FLXANIMATE_DRAW == true;
+		if (legacyFlxAnimateDraw)
+		{
+			// the old renderer kept its own origin: half of the atlas' first sprite frame
+			var first = library != null && library.frames.length > 0 ? library.frames[0] : null;
+			if (first != null) legacyOrigin.set(first.sourceSize.x * 0.5, first.sourceSize.y * 0.5);
+			updateHitbox();
+		}
+		return result;
+	}
+
+	override function updateHitbox():Void
+	{
+		if (legacyFlxAnimateDraw)
+		{
+			// the old outer sprite had no graphic, so atlas characters were 0x0 (midpoint == position)
+			width = height = 0;
+			offset.set(0, 0);
+			return;
+		}
+		super.updateHitbox();
 	}
 
 	public function loadSprite(path:String, Unique:Bool = false, Key:String = null)
@@ -279,8 +306,85 @@ class FunkinSprite extends FlxAnimate implements IBeatReceiver implements IOffse
 		return FlxPoint.weak(0, 0);
 	}
 
-	public inline function hasAnim(AnimName:String):Bool
-		return animation.exists(AnimName);
+	public function hasAnim(AnimName:String):Bool {
+		if (animation.exists(AnimName)) return true;
+		// Old engine (cne-flxanimate): any atlas symbol name was playable even without an XML anim
+		// (e.g. playAnim("idle" + idleSuffix) -> symbol "idleleft"). Recreate that for legacy mods.
+		if (legacyFlxAnimateDraw && AnimName != null && library != null && !__notSymbols.exists(AnimName)) {
+			// getSymbol scans every symbol and logs a warning on a miss, and hasAnim runs every frame,
+			// so remember names that aren't symbols instead of looking them up again
+			if (@:privateAccess library.dictionary.exists(AnimName) || __atlasHasSymbol(AnimName)) {
+				// reuse the speed, looping and offset of an XML anim built from the same symbol
+				// (e.g. "idleleft" requested by idleSuffix, defined in XML as idle-left at 12 fps)
+				var src:AnimData = null;
+				for (d in animDatas) if (d.anim == AnimName && (d.indices == null || d.indices.length == 0)) { src = d; break; }
+				if (src != null) {
+					// the old engine played raw symbols at its standard animation speed (24 fps), not the XML anim's
+					anim.addBySymbol(AnimName, AnimName, 24, src.loop);
+					addOffset(AnimName, src.x, src.y);
+				} else
+					anim.addBySymbol(AnimName, AnimName, null, false);
+				#if switch openfl.CneBootLog.trace('[legacy] symbol anim "' + AnimName + '" from ' + (src != null ? 'XML anim "' + src.name + '" fps 24' + ' loop ' + src.loop : 'atlas defaults')); #end
+				return animation.exists(AnimName);
+			}
+			__notSymbols.set(AnimName, true);
+		}
+		return false;
+	}
+
+	#if switch
+	@:noCompletion var __dumpedAnims:Map<String, Bool> = new Map();
+
+	// diagnostic: logs what the first frame of a legacy atlas anim draws (nested symbols, frame picked, alpha, blend)
+	@:noCompletion @:privateAccess function __dumpAtlasAnim(name:String) {
+		var a = animation.curAnim;
+		if (a == null || !Std.isOfType(a, FlxAnimateAnimation)) return;
+		var tl:animate.internal.Timeline = cast(a, FlxAnimateAnimation).timeline;
+		if (tl == null) return;
+		var out = ['[atlas] ' + name + ' sprite alpha ' + alpha + ' fps ' + a.frameRate + ' frames ' + a.numFrames];
+		function walk(t:animate.internal.Timeline, frameNum:Int, depth:Int) {
+			if (depth > 4 || out.length > 60) return;
+			var pad = StringTools.lpad('', ' ', depth * 2);
+			for (li in 0...t.layers.length) {
+				var layer = t.layers[li];
+				var fr = layer.getFrameAtIndex(frameNum);
+				if (fr == null) { out.push(pad + 'L' + li + ' "' + layer.name + '" no frame @' + frameNum); continue; }
+				out.push(pad + 'L' + li + ' "' + layer.name + '" vis ' + layer.visible + ' type ' + layer.layerType + ' kf ' + fr.index + ' n ' + fr.elements.length + ' col ' + fr.isColored + ' blend ' + fr.blend + ' tween ' + (fr.tween != null));
+				for (e in fr.elements) {
+					var info = pad + ' - ' + e.elementType + ' vis ' + e.visible + ' blend ' + e.blend + ' col ' + e.isColored
+						+ (e.transform != null ? ' am ' + e.transform.alphaMultiplier + ' ao ' + e.transform.alphaOffset : '');
+					if (Std.isOfType(e, animate.internal.elements.SymbolInstance)) {
+						var s:animate.internal.elements.SymbolInstance = cast e;
+						var idx = s.libraryItem != null ? s.getFrameIndex(frameNum, fr.index) : -99;
+						out.push(info + ' sym "' + s.symbolName + '" lp ' + s.loopType + ' ff ' + s.firstFrame + ' -> frame ' + idx);
+						if (s.libraryItem != null) walk(s.libraryItem.timeline, idx, depth + 1);
+					} else if (Std.isOfType(e, animate.internal.elements.AtlasInstance)) {
+						var at:animate.internal.elements.AtlasInstance = cast e;
+						out.push(info + ' atlas ' + (at.frame != null ? at.frame.name + ' ' + at.frame.frame + ' bmp ' + (at.frame.parent != null && at.frame.parent.bitmap != null) : 'null'));
+					} else out.push(info);
+				}
+			}
+		}
+		walk(tl, 0, 0);
+		openfl.CneBootLog.trace(out.join('\n'));
+	}
+	#end
+
+	@:noCompletion var __notSymbols:Map<String, Bool> = new Map();
+	@:noCompletion var __symbolNames:Map<String, Bool> = null;
+
+	@:noCompletion function __atlasHasSymbol(name:String):Bool {
+		if (__symbolNames == null) {
+			__symbolNames = new Map();
+			@:privateAccess {
+				var sd = library._symbolDictionary;
+				if (sd != null) for (i in 0...sd.length) __symbolNames.set(sd[i].SN, true);
+				var list = library._libraryList;
+				if (list != null) for (n in list) __symbolNames.set(n, true);
+			}
+		}
+		return __symbolNames.exists(name);
+	}
 
 	public inline function getAnimName()
 		return animation.name;

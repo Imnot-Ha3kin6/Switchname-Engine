@@ -78,6 +78,7 @@ class AdvancedAppearanceOptions extends TreeMenuScreen {
 			add(option);
 
 		add(new Checkbox(getNameID('gpuOnlyBitmaps'), getDescID('gpuOnlyBitmaps'), 'gpuOnlyBitmaps'));
+		add(new NumOption(getNameID('screenEffectsResolution'), getDescID('screenEffectsResolution'), 25, 100, 25, 'screenEffectsResolution', (_) -> Options.applyScreenEffectsResolution()));
 
 		updateQualityOptions();
 	}

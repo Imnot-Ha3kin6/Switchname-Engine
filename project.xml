@@ -1,5 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <project xmlns="http://lime.software/project/1.0.4" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://lime.software/project/1.0.4 http://lime.software/xsd/project-1.0.4.xsd">
+	<haxedef name="lime-opengl" if="switch"/>
+	<set name="LIME_OPENGL" value="1" if="switch"/>
+	<template path="../lime-nx/templates" if="switch"/>
 	<!-- ____________________________ Window Settings ___________________________ -->
 
 	<!-- CHANGE THE SAVE PATH & NAME FOR YOUR MOD HERE! -->
@@ -31,7 +34,7 @@
 		<define name="DISCORD_RPC" if="desktop"/>
 
 		<!-- Compile with video support (hxvlc) -->
-		<define name="VIDEO_CUTSCENES" if="desktop || mobile"/>
+		<define name="VIDEO_CUTSCENES" if="desktop || mobile || switch"/>
 	</section>
 
 	<!-- Compile with tracy, use to catch memory leaks, generally, don't use this, inflates memory usages by 16gb~ -->
@@ -76,7 +79,7 @@
 	<haxedef name="SOFTCODED_STATES"/>
 
 	<!-- Comment this out to disable support for custom ndlls. !-->
-	<haxedef name="NDLLS_SUPPORTED" unless="web || iphonesim || hl"/>
+	<haxedef name="NDLLS_SUPPORTED" unless="web || iphonesim || hl || switch"/>
 
 	<!-- Comment this out to use the default OpenFL assets system for the assets/ folder. !-->
 	<define name="USE_ADAPTED_ASSETS" unless="web"/>
@@ -96,6 +99,12 @@
 		file="CodenameEngine" packageName="com.yoshman29.codenameengine"
 		package="com.yoshman29.codenameengine"
 		version="1.1.0" company="Yoshman29"/>
+
+	<!-- Switchname Engine (Nintendo Switch port). The main build uses deko3d (-Dswitch_deko3d);
+	     the OpenGL/Mesa build is kept as a fallback under its own name and folder. -->
+	<app title="Switchname Engine (OpenGL)" file="SwitchnameEngine-GL" company="Switchname Engine" if="switch"/>
+	<app title="Switchname Engine" file="SwitchnameEngine" if="switch_deko3d"/>
+	<setenv name="CNE_APP_VERSION" value="1.0.0" if="switch"/> <!-- keep in step with Flags.SWITCHNAME_VERSION -->
 
 	<!--Switch Export with Unique ApplicationID and Icon-->
 	<set name="APP_ID" value="0x0100f6c013bbc000"/>
@@ -120,7 +129,9 @@
 	<!-- ____________________________ Window Settings ___________________________ -->
 
 	<window hardware="true" color-depth="32" background="" fps="0" orientation="landscape"/>
-	<window unless="desktop" width="0" height="0" vsync="true" fullscreen="true"/>
+	<window unless="desktop || switch" width="0" height="0" vsync="true" fullscreen="true"/>
+	<!-- Switch: render at the game's native 1280x720 and let the console upscale when docked (1080p costs 2.25x the GPU fill) -->
+	<window if="switch" width="1280" height="720" vsync="true" fullscreen="false"/>
 	<window if="desktop" type="opengl" width="1280" height="720" fullscreen="false" resizable="true" vsync="false"/>
 	<window if="desktop" unless="mac" allowHighDPI="true"/>
 	<window if="mobile" resizable="false"/>
@@ -142,7 +153,8 @@
 
 	<haxelib name="markdown" unless="STRIPPED_COMPILE"/>
 
-	<haxelib name="hxvlc" if="VIDEO_CUTSCENES"/>
+	<!-- Switch uses the FFmpeg-based hxvlc.flixel.FlxVideoSprite in source-switch instead of libVLC -->
+	<haxelib name="hxvlc" if="VIDEO_CUTSCENES" unless="switch"/>
 	<haxelib name="hxdiscord_rpc" if="DISCORD_RPC"/>
 	<!--<haxelib name="away3d" if="THREE_D_SUPPORT"/>-->
 	<haxelib name="foxlite" if="THREE_D_SUPPORT"/>
@@ -161,9 +173,12 @@
 	<set name="BUILD_DIR" value="export/release-32bit" if="32bit" unless="debug"/>
 	<set name="BUILD_DIR" value="export/tracy" if="TRACY"/>
 	<set name="BUILD_DIR" value="latest/" if="beta"/>
+	<set name="BUILD_DIR" value="export/release-dk" if="switch_deko3d" unless="debug"/>
 
 	<app main="funkin.backend.system.Main" preloader="flixel.system.FlxPreloader"/>
 	<source name="source"/>
+	<!-- Switch-only stand-ins for libraries that are unavailable there (e.g. hxvlc video) -->
+	<source name="source-switch" if="switch"/>
 
 	<!-- ____________________________ Assets Settings ___________________________ -->
 

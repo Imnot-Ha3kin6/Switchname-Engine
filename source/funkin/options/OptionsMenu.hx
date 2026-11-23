@@ -22,6 +22,13 @@ class OptionsMenu extends TreeMenu {
 			suffix: '',
 			substate: funkin.options.keybinds.KeybindsOptions
 		},
+		#if switch
+		{
+			name: 'optionsTree.controller-name',
+			desc: 'optionsTree.controller-desc',
+			state: ControllerOptions
+		},
+		#end
 		{
 			name: 'optionsTree.gameplay-name',
 			desc: 'optionsTree.gameplay-desc',

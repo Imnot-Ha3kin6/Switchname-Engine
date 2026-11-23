@@ -128,6 +128,8 @@ class PlayState extends MusicBeatState
 	 * Whenever the score will save when you beat the song.
 	 */
 	public var validScore:Bool = true;
+	/** "BOTPLAY" label shown while botplay is on. */
+	public var botplayTxt:FunkinText;
 	/**
 	 * Whenever the player can die.
 	 */
@@ -633,7 +635,10 @@ class PlayState extends MusicBeatState
 		if (!hits.exists(rating.name))
 			hits.set(rating.name, 0);
 
-		if (Options.ghostTapping) {
+		if (Flags.MOD_API_VERSION < 2) {
+			// old engine (mod API 1): the HUD said "Combo Breaks" only with ghost tapping off
+			comboBreaks = !Options.ghostTapping;
+		} else if (Options.ghostTapping) {
 			comboBreaks = false;
 			for (rating in ratingManager.ratingData)
 				comboBreaks = comboBreaks || rating.breaksCombo;
@@ -869,6 +874,12 @@ class PlayState extends MusicBeatState
 			strumLines.add(strLine);
 		}
 
+		if (Options.botplay) {
+			validScore = false; // never save a highscore for botplay
+			for (strLine in strumLines.members)
+				if (!strLine.cpu) strLine.botplay = true;
+		}
+
 		add(strumLines);
 
 		splashHandler = new SplashHandler();
@@ -957,6 +968,14 @@ class PlayState extends MusicBeatState
 
 		for(e in [healthBar, healthBarBG, iconP1, iconP2, scoreTxt, missesTxt, accuracyTxt])
 			e.cameras = [camHUD];
+
+		if (Options.botplay) {
+			botplayTxt = new FunkinText(0, healthBarBG.y - 60, FlxG.width, "BOTPLAY", 32);
+			botplayTxt.alignment = CENTER;
+			botplayTxt.scrollFactor.set();
+			botplayTxt.cameras = [camHUD];
+			add(botplayTxt);
+		}
 		#end
 
 		startingSong = true;
@@ -993,7 +1012,83 @@ class PlayState extends MusicBeatState
 		__updateNote_event = EventManager.get(NoteUpdateEvent);
 
 		gameAndCharsCall("postCreate", null, "gamePostCreate");
+
+		#if switch
+		preloadSongAssets();
+		#end
 	}
+
+	#if switch
+	static var __programBinaryChecked:Bool = false;
+
+	/**
+	 * Switch: load and GPU-upload everything the song will use before it starts, so nothing
+	 * has to load mid-song (the console is slow at decoding/uploading big textures on demand).
+	 */
+	function preloadSongAssets() {
+		var started = haxe.Timer.stamp();
+
+		// every character a "Character Change" event can switch to, not only the opted-in ones
+		for (event in SONG.events)
+			if (event.name == "Character Change" && event.params[2] != null && !Character.cachedFrames.exists(event.params[2]))
+				try Character.cacheCharacter(event.params[2]) catch (e:Dynamic) Logs.warn('Could not preload character ${event.params[2]}: $e');
+
+		// every note splash style the chart uses
+		var splashNames:Map<String, Bool> = [];
+		for (strLine in strumLines.members)
+			for (note in strLine.notes.members)
+				if (note != null && note.splash != null) splashNames.set(note.splash, true);
+		for (name in splashNames.keys())
+			try splashHandler.getSplashGroup(name) catch (e:Dynamic) {}
+
+		// upload every loaded image to the GPU now instead of the first time it is drawn
+		var uploaded = 0;
+		var context = FlxG.stage.context3D;
+		if (context != null) @:privateAccess {
+			for (graphic in FlxG.bitmap._cache) {
+				var bmp = graphic != null ? graphic.bitmap : null;
+				// giant sheets (e.g. 7540x7778) stay lazy: uploading them all up front can run the GPU out of memory
+				if (bmp != null && bmp.image != null && bmp.__texture == null && bmp.width * bmp.height <= 4096 * 4096) {
+					try { bmp.getTexture(context); uploaded++; } catch (e:Dynamic) {}
+				}
+			}
+		}
+
+		// compile every shader the song uses now (the GPU driver compiles GLSL on first use otherwise)
+		var compiled = 0;
+		if (context != null) {
+			var shaders:Array<openfl.display.Shader> = [];
+			inline function addFilters(list:Array<openfl.filters.BitmapFilter>)
+				if (list != null) for (f in list) if (Std.isOfType(f, openfl.filters.ShaderFilter)) shaders.push(cast(f, openfl.filters.ShaderFilter).shader);
+			for (cam in FlxG.cameras.list) addFilters(@:privateAccess cam.filters);
+			addFilters(@:privateAccess FlxG.game.__filters);
+			function scan(members:Array<Dynamic>) {
+				for (member in members) {
+					if (member == null) continue;
+					if (Std.isOfType(member, FlxSprite) && member.shader != null) shaders.push(member.shader);
+					if (Std.isOfType(member, flixel.group.FlxGroup.FlxTypedGroup)) scan(member.members);
+					else if (Std.isOfType(member, flixel.group.FlxSpriteGroup.FlxTypedSpriteGroup)) scan(member.group.members);
+				}
+			}
+			scan(cast members);
+
+			if (!__programBinaryChecked) {
+				__programBinaryChecked = true;
+				// 0x87FE = GL_NUM_PROGRAM_BINARY_FORMATS: can compiled shaders be saved and reloaded?
+				var formats:Dynamic = @:privateAccess context.gl.getParameter(0x87FE);
+				Logs.trace('GPU driver program binary formats: $formats', INFO);
+			}
+			@:privateAccess for (shader in shaders) {
+				if (shader == null || shader.__context != null) continue;
+				try { shader.__context = context; shader.__init(); compiled++; } catch (e:Dynamic) {}
+			}
+		}
+
+		// clean up what loading left behind now, not in the middle of the song
+		cpp.vm.Gc.run(true);
+		Logs.trace('Preloaded song assets in ${Std.int((haxe.Timer.stamp() - started) * 1000)}ms (${uploaded} textures uploaded, ${compiled} shaders compiled)', INFO);
+	}
+	#end
 
 	/**
 	 * Function used to update Discord Presence.
@@ -1483,7 +1578,8 @@ class PlayState extends MusicBeatState
 		if (!ratingStuffValid || cachedMisses != misses || cachedComboBreaks != comboBreaks) {
 			cachedMisses = misses;
 			cachedComboBreaks = comboBreaks;
-			missesStr = (comboBreaks ? TEXT_GAME_COMBOBREAKS : TEXT_GAME_MISSES).format([misses]);
+			// mods made for the old engine (API 1) always label it "Misses"
+			missesStr = (comboBreaks && Flags.MOD_API_VERSION >= 2 ? TEXT_GAME_COMBOBREAKS : TEXT_GAME_MISSES).format([misses]);
 		}
 		missesTxt.text = missesStr;
 
@@ -2113,7 +2209,8 @@ class PlayState extends MusicBeatState
 
 		note.wasGoodHit = true;
 
-		var noteDiff = Math.abs(Conductor.songPosition - note.strumTime), rating:Rating;
+		// botplay hits are perfectly timed, so they always rate Sick
+		var noteDiff = (strumLine != null && strumLine.botplay) ? 0 : Math.abs(Conductor.songPosition - note.strumTime), rating:Rating;
 		if (!Flags.USE_LEGACY_TIMING) rating = ratingManager.judgeNote(noteDiff);
 		else {
 			(rating = _legacyRating).splash = false;
@@ -2150,6 +2247,11 @@ class PlayState extends MusicBeatState
 		else
 			event = EventManager.get(NoteHitEvent).recycle(rating.breaksCombo, false, false, null, null, null, note, strumLine.characters, false, note.noteType, note.animSuffix.getDefault(note.strumID < strumLine.members.length ? strumLine.members[note.strumID].animSuffix : strumLine.animSuffix), "game/score/", "", note.strumID, 0, null, 0, rating.name, false, null, null, null, null, true, iconP2, false);
 		event.deleteNote = !note.isSustainNote; // work around, to allow sustain notes to be deleted
+		if (strumLine != null && strumLine.botplay) {
+			// botplay plays for you: no score, accuracy or highscore
+			event.countScore = false;
+			event.accuracy = null;
+		}
 		event = scripts.event(strumLine != null && !strumLine.cpu ? "onPlayerHit" : "onDadHit", event);
 		strumLine.onHit.dispatch(event);
 		gameAndCharsEvent("onNoteHit", event);

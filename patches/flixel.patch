@@ -1,0 +1,36 @@
+diff --git a/flixel/input/gamepad/FlxGamepadManager.hx b/flixel/input/gamepad/FlxGamepadManager.hx
+index 19b3d065..8d97d48e 100644
+--- a/flixel/input/gamepad/FlxGamepadManager.hx
++++ b/flixel/input/gamepad/FlxGamepadManager.hx
+@@ -584,7 +584,17 @@ class FlxGamepadManager implements IFlxInputManager
+ 	{
+ 		for (gamepad in _gamepads)
+ 			if (gamepad != null)
++			{
+ 				gamepad.update();
++				#if switch
++				// Switch SDL reports all 8 player slots as connected, so the last
++				// *connected* pad is usually an empty slot. Track the last pad used.
++				if (gamepad.anyButton(JUST_PRESSED))
++				{
++					lastActive = gamepad;
++				}
++				#end
++			}
+ 	}
+ 
+ 	inline function onFocus():Void {}
+diff --git a/flixel/input/mouse/FlxMouse.hx b/flixel/input/mouse/FlxMouse.hx
+index 6b2e6347..cdddba76 100644
+--- a/flixel/input/mouse/FlxMouse.hx
++++ b/flixel/input/mouse/FlxMouse.hx
+@@ -877,6 +877,9 @@ class FlxMouse extends FlxPointer implements IFlxInputManager
+ 
+ 	function set_useSystemCursor(value:Bool):Bool
+ 	{
++		#if switch
++		value = false; // no system cursor on Switch: always draw Flixel's cursor sprite
++		#end
+ 		if (value)
+ 		{
+ 			showSystemCursor();

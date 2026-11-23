@@ -68,19 +68,33 @@ class Main extends Sprite
 	public static var time:Int = 0;
 
 	// You can pretty much ignore everything from here on - your code should go in your states.
+	#if switch
+	static function bootLog(message:String) {
+		var output = File.append('sdmc:/switch/cne-port-boot.log', false);
+		output.writeString(message + '\n');
+		output.close();
+	}
+	#end
 
 	public static function preInit() {
 		#if sys
+		#if switch bootLog('Haxe preInit entered'); #end
 		funkin.backend.utils.NativeAPI.registerAsDPICompatible();
+		#if switch bootLog('DPI registration done'); #end
 		funkin.backend.system.CommandLineHandler.parseCommandLine(Sys.args());
+		#if switch bootLog('command line parsed'); #end
 		funkin.backend.system.Main.fixWorkingDirectory();
+		#if switch bootLog('working directory set'); #end
 		funkin.backend.system.Logs.init();
+		#if switch bootLog('logs initialized'); #end
 		#end
 	}
 
 	public function new()
 	{
+		#if switch bootLog('Main constructor entered'); #end
 		super();
+		#if switch bootLog('Sprite constructor done'); #end
 
 		instance = this;
 
@@ -90,18 +104,25 @@ class Main extends Sprite
 		#end
 		// Before the game loop, so an uncaught error is drawn in-game instead of closing the window.
 		CrashHandler.init();
+		#if switch bootLog('CrashHandler initialized'); #end
 		ConsoleUI.init();
+		#if switch bootLog('ConsoleUI initialized'); #end
 
 		// i hate you hxcpp
 		FakeCamera.instance = new FakeCamera();
 		FakeCallCamera.instance = new FakeCallCamera();
 
 		addChild(game = new FunkinGame(gameWidth, gameHeight, MainState, Options.framerate, Options.framerate, skipSplash, startFullscreen));
+		#if switch bootLog('FunkinGame created'); funkin.options.GamepadBinds.applyDeadZone(); funkin.switchport.SwitchScreenshot.init(); funkin.switchport.SwitchCursor.init(); funkin.switchport.SwitchKeyboard.init(); funkin.switchport.CharacterPrefetcher.init(); FlxG.signals.preStateCreate.add(_ -> { cpp.vm.Gc.run(true); openfl.CneBootLog.trace('[mem] before state create: ' + openfl.CneBootLog.mem()); }); FlxG.signals.postUpdate.add(() -> funkin.switchport.SwitchWatchdog.update()); #end
 
 		#if (!mobile && !web)
+		#if switch bootLog('before Framerate creation'); #end
 		addChild(framerateSprite = new Framerate());
+		#if switch bootLog('Framerate created'); #end
 		SystemInfo.init();
+		#if switch bootLog('SystemInfo initialized'); #end
 		#end
+		#if switch bootLog('Main constructor complete'); #end
 	}
 
 	@:dox(hide)
@@ -121,16 +142,34 @@ class Main extends Sprite
 	@:dox(hide) public static function execAsync(func:Void->Void) ThreadUtil.execAsync(func);
 
 	public static function loadGameSettings() {
+		#if switch bootLog('loadGameSettings entered'); #end
 		WindowUtils.init();
+		#if switch bootLog('WindowUtils initialized'); #end
 		SaveWarning.init();
+		#if switch bootLog('SaveWarning initialized'); #end
 		MemoryUtil.init();
+		#if switch bootLog('MemoryUtil initialized'); #end
 		FunkinCache.init();
+		#if switch bootLog('FunkinCache initialized'); #end
 		Paths.assetsTree = new AssetsLibraryList();
+		#if switch bootLog('asset tree created'); #end
+		#if switch
+		for (probe in ['./assets', './assets/languages/', 'romfs:/assets/languages/', 'assets/languages', './assets/data/weeks/', './assets/songs/']) {
+			try {
+				var entries = sys.FileSystem.readDirectory(probe);
+				bootLog('probe ' + probe + ' -> ' + entries.length + ' entries: ' + entries.slice(0, 8).join(',') + ' isDir(first)=' + (entries.length > 0 ? Std.string(sys.FileSystem.isDirectory(haxe.io.Path.addTrailingSlash(probe) + entries[0])) : 'n/a'));
+			} catch (e:Dynamic) {
+				bootLog('probe ' + probe + ' failed: ' + Std.string(e));
+			}
+		}
+		bootLog('cwd=' + Sys.getCwd());
+		#end
 
 		#if UPDATE_CHECKING
 		funkin.backend.system.updating.UpdateUtil.init();
 		#end
 		Paths.init();
+		#if switch bootLog('Paths initialized'); #end
 
 		hscript.Interp.importRedirects = funkin.backend.scripting.Script.getDefaultImportRedirects();
 
@@ -142,9 +181,11 @@ class Main extends Sprite
 		@:privateAccess
 		lib.__proxy = Paths.assetsTree;
 		Assets.registerLibrary('default', lib);
+		#if switch bootLog('default asset library registered'); #end
 
 		funkin.options.PlayerSettings.init();
 		Options.load();
+		#if switch bootLog('options loaded'); #end
 
 		game.focusLostFramerate = 30;
 		FlxG.fixedTimestep = false;
@@ -153,7 +194,9 @@ class Main extends Sprite
 		FlxG.sound.reverseSoundCurve = reverseSoundCurve;
 
 		Conductor.init();
+		#if switch bootLog('Conductor initialized'); #end
 		EventManager.init();
+		#if switch bootLog('EventManager initialized'); #end
 		FlxG.signals.focusGained.add(onFocus);
 		FlxG.signals.preStateSwitch.add(onStateSwitch);
 		FlxG.signals.postStateSwitch.add(onStateSwitchPost);
@@ -165,6 +208,7 @@ class Main extends Sprite
 		#end
 
 		ModsFolder.init();
+		#if switch bootLog('ModsFolder initialized'); #end
 		#if MOD_SUPPORT
 		if (FileSystem.exists("mods/autoload.txt"))
 			modToLoad = File.getContent("mods/autoload.txt").trim();
@@ -173,6 +217,7 @@ class Main extends Sprite
 		#end
 
 		initTransition();
+		#if switch bootLog('loadGameSettings complete'); #end
 	}
 
 	public static function applySoundCurve(volume:Float) {
@@ -280,7 +325,9 @@ class Main extends Sprite
 		}
 		#elseif android
 		Sys.setCwd(haxe.io.Path.addTrailingSlash(VERSION.SDK_INT > 30 ? Context.getObbDir() : Context.getExternalFilesDir()));
-		#elseif (ios || switch)
+		#elseif switch
+		Sys.setCwd('romfs:/');
+		#elseif ios
 		Sys.setCwd(haxe.io.Path.addTrailingSlash(openfl.filesystem.File.applicationStorageDirectory.nativePath));
 		#end
 	}

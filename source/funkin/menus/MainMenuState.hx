@@ -78,7 +78,7 @@ class MainMenuState extends MusicBeatState
 
 		versionText = new FunkinText(5, FlxG.height - 2, 0, [
 			Flags.VERSION_MESSAGE,
-			TU.translate("mainMenu.commit", [Flags.COMMIT_NUMBER, Flags.COMMIT_HASH]),
+			#if switch 'Based on Codename Engine v${Flags.VERSION}' #else TU.translate("mainMenu.commit", [Flags.COMMIT_NUMBER, Flags.COMMIT_HASH]) #end,
 			TU.translate("mainMenu.openMods", [controls.getKeyName(SWITCHMOD)]),
 			''
 		].join('\n'));

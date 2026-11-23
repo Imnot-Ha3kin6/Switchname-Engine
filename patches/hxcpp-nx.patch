@@ -1,0 +1,67 @@
+diff --git a/include/hxString.h b/include/hxString.h
+index b53ddd4..6d7d171 100644
+--- a/include/hxString.h
++++ b/include/hxString.h
+@@ -251,6 +251,8 @@ public:
+ 
+    unsigned int calcHash() const;
+    unsigned int calcSubHash(int start, int length) const;
++   bool __StartsWith(const String &inValue) const;
++   bool __EndsWith(const String &inValue) const;
+ 
+    #ifdef HX_SMART_STRINGS
+    int compare(const ::String &inRHS) const;
+diff --git a/src/String.cpp b/src/String.cpp
+index 723017f..a2e8579 100644
+--- a/src/String.cpp
++++ b/src/String.cpp
+@@ -1677,6 +1677,35 @@ int String::compare(const ::String &inRHS) const
+ #endif
+ 
+ 
++bool String::__StartsWith(const String &inValue) const
++{
++   if (!__s) return false;
++   if (!inValue.__s) return true;
++   if (inValue.length > length) return false;
++   if (inValue.length == 0) return true;
++   if (isUTF16Encoded() && inValue.isUTF16Encoded())
++      return memcmp(__w, inValue.__w, inValue.length * sizeof(char16_t)) == 0;
++   if (isUTF16Encoded() || inValue.isUTF16Encoded())
++      return isUTF16Encoded() ? StrMatch(__w, inValue.__s, inValue.length)
++                              : StrMatch(inValue.__w, __s, inValue.length);
++   return memcmp(__s, inValue.__s, inValue.length) == 0;
++}
++
++bool String::__EndsWith(const String &inValue) const
++{
++   if (!__s) return false;
++   if (!inValue.__s) return true;
++   if (inValue.length > length) return false;
++   if (inValue.length == 0) return true;
++   int offset = length - inValue.length;
++   if (isUTF16Encoded() && inValue.isUTF16Encoded())
++      return memcmp(__w + offset, inValue.__w, inValue.length * sizeof(char16_t)) == 0;
++   if (isUTF16Encoded() || inValue.isUTF16Encoded())
++      return isUTF16Encoded() ? StrMatch(__w + offset, inValue.__s, inValue.length)
++                              : StrMatch(inValue.__w, __s + offset, inValue.length);
++   return memcmp(__s + offset, inValue.__s, inValue.length) == 0;
++}
++
+ namespace hx
+ {
+ 
+diff --git a/src/hx/libs/std/Sys.cpp b/src/hx/libs/std/Sys.cpp
+index a186ee0..d088a52 100644
+--- a/src/hx/libs/std/Sys.cpp
++++ b/src/hx/libs/std/Sys.cpp
+@@ -240,7 +240,8 @@ String _hx_std_get_cwd()
+ **/
+ bool _hx_std_set_cwd( String d )
+ {
+-   #if !defined(HX_WINRT) && !defined(EPPC) && !defined(HX_NX)
++   // libnx's devoptabs (romfs:/, sdmc:/) implement chdir, so allow it on Switch.
++   #if !defined(HX_WINRT) && !defined(EPPC)
+ #ifdef NEKO_WINDOWS
+    return SetCurrentDirectoryW(d.wchar_str()) == 0;
+ #else

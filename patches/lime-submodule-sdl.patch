@@ -1,0 +1,118 @@
+diff --git a/src/audio/switch/SDL_switchaudio.c b/src/audio/switch/SDL_switchaudio.c
+index 83c0d7c..7faa9a0 100644
+--- a/src/audio/switch/SDL_switchaudio.c
++++ b/src/audio/switch/SDL_switchaudio.c
+@@ -86,14 +86,14 @@ static bool SWITCHAUDIO_OpenDevice(SDL_AudioDevice *device)
+         return SDL_SetError("Mixing buffer is too large.");
+     }
+ 
+-    size = (u32)((device->buffer_size * 2) + 0xfff) & ~0xfff;
++    size = (u32)((device->buffer_size * SWITCHAUDIO_BUFFERS) + 0xfff) & ~0xfff;
+     device->hidden->pool = memalign(0x1000, size);
+-    for (int i = 0; i < 2; i++) {
++    for (int i = 0; i < SWITCHAUDIO_BUFFERS; i++) {
+         device->hidden->buffer[i].data_raw = device->hidden->pool;
+-        device->hidden->buffer[i].size = device->buffer_size * 2;
++        device->hidden->buffer[i].size = device->buffer_size * SWITCHAUDIO_BUFFERS;
+         device->hidden->buffer[i].start_sample_offset = i * device->sample_frames;
+         device->hidden->buffer[i].end_sample_offset = device->hidden->buffer[i].start_sample_offset + device->sample_frames;
+-        device->hidden->buffer_tmp = SDL_malloc(device->buffer_size);
++        if (!device->hidden->buffer_tmp) device->hidden->buffer_tmp = SDL_malloc(device->buffer_size);
+     }
+ 
+     mpid = audrvMemPoolAdd(&device->hidden->driver, device->hidden->pool, size);
+@@ -125,48 +125,46 @@ static bool SWITCHAUDIO_OpenDevice(SDL_AudioDevice *device)
+ 
+ static bool SWITCHAUDIO_PlayDevice(SDL_AudioDevice *device, const Uint8 *buffer, int buflen)
+ {
+-    int current = -1;
+-    for (int i = 0; i < 2; i++) {
+-        if (device->hidden->buffer[i].state == AudioDriverWaveBufState_Free || device->hidden->buffer[i].state == AudioDriverWaveBufState_Done) {
+-            current = i;
+-            break;
+-        }
+-    }
+-
+     /* paranoia */
+     SDL_assert(buffer == device->hidden->buffer_tmp);
+     SDL_assert(buflen == device->buffer_size);
+ 
+-    if (current >= 0) {
+-        Uint8 *ptr = (Uint8 *)(device->hidden->pool + (current * device->buffer_size));
+-        memcpy(ptr, device->hidden->buffer_tmp, device->buffer_size);
+-        armDCacheFlush(ptr, device->buffer_size);
+-        audrvVoiceAddWaveBuf(&device->hidden->driver, 0, &device->hidden->buffer[current]);
+-    } else if (!audrvVoiceIsPlaying(&device->hidden->driver, 0)) {
+-        audrvVoiceStart(&device->hidden->driver, 0);
+-    }
+-
+-    audrvUpdate(&device->hidden->driver);
+-
+-    if (current >= 0) {
+-        while (device->hidden->buffer[current].state != AudioDriverWaveBufState_Playing) {
+-            audrvUpdate(&device->hidden->driver);
+-            audrenWaitFrame();
+-        }
+-    } else {
+-        current = -1;
+-        for (int i = 0; i < 2; i++) {
+-            if (device->hidden->buffer[i].state == AudioDriverWaveBufState_Playing) {
++    /* Find a free buffer, waiting for one to finish if they are all queued.
++     * If the game stalled long enough for every buffer to play out, the voice stops; the
++     * original driver queued the next buffer without restarting it and then waited forever
++     * for it to play, silencing audio for good. Restart the voice whenever it is stopped,
++     * and never wait more than about a second. */
++    int current = -1;
++    for (int tries = 0; tries < 200 && current < 0; tries++) {
++        for (int i = 0; i < SWITCHAUDIO_BUFFERS; i++) {
++            if (device->hidden->buffer[i].state == AudioDriverWaveBufState_Free || device->hidden->buffer[i].state == AudioDriverWaveBufState_Done) {
+                 current = i;
+                 break;
+             }
+         }
+-        while (device->hidden->buffer[current].state == AudioDriverWaveBufState_Playing) {
++        if (current < 0) {
++            if (!audrvVoiceIsPlaying(&device->hidden->driver, 0)) {
++                audrvVoiceStart(&device->hidden->driver, 0);
++            }
+             audrvUpdate(&device->hidden->driver);
+             audrenWaitFrame();
+         }
+     }
+ 
++    if (current < 0) {
++        return true; /* still nothing free: drop this chunk rather than hang the audio thread */
++    }
++
++    Uint8 *ptr = (Uint8 *)(device->hidden->pool + (current * device->buffer_size));
++    memcpy(ptr, device->hidden->buffer_tmp, device->buffer_size);
++    armDCacheFlush(ptr, device->buffer_size);
++    audrvVoiceAddWaveBuf(&device->hidden->driver, 0, &device->hidden->buffer[current]);
++
++    if (!audrvVoiceIsPlaying(&device->hidden->driver, 0)) {
++        audrvVoiceStart(&device->hidden->driver, 0);
++    }
++    audrvUpdate(&device->hidden->driver);
++
+     return true;
+ }
+ 
+diff --git a/src/audio/switch/SDL_switchaudio.h b/src/audio/switch/SDL_switchaudio.h
+index b8107e5..4373044 100644
+--- a/src/audio/switch/SDL_switchaudio.h
++++ b/src/audio/switch/SDL_switchaudio.h
+@@ -26,10 +26,13 @@
+ 
+ #include <switch.h>
+ 
++// More than double buffering so a short stall in the game does not drain the queue
++#define SWITCHAUDIO_BUFFERS 4
++
+ struct SDL_PrivateAudioData
+ {
+     AudioDriver driver;
+-    AudioDriverWaveBuf buffer[2];
++    AudioDriverWaveBuf buffer[SWITCHAUDIO_BUFFERS];
+     void *buffer_tmp;
+     void *pool;
+     bool audr_device;

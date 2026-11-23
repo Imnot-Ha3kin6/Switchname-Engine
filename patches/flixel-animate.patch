@@ -1,0 +1,125 @@
+diff --git a/src/animate/FlxAnimate.hx b/src/animate/FlxAnimate.hx
+index 132c786..8e40730 100644
+--- a/src/animate/FlxAnimate.hx
++++ b/src/animate/FlxAnimate.hx
+@@ -106,6 +106,18 @@ class FlxAnimate extends FlxSprite
+ 	 */
+ 	public var postStageMatrixApply:Bool = false;
+ 
++	/**
++	 * Codename Engine compatibility: draw texture atlases the way the old `cne-flxanimate`
++	 * library did (used by mods made for Codename before flixel-animate, mod API 1).
++	 * The stage matrix is applied first and `legacyOrigin` (half the first sprite frame)
++	 * is used as the origin; together with Codename's 0x0 legacy hitbox this matches
++	 * the old placement and camera framing.
++	 */
++	public var legacyFlxAnimateDraw:Bool = false;
++
++	/** Origin the old renderer used: half the size of the atlas' first sprite frame. */
++	public var legacyOrigin(default, null):FlxPoint = FlxPoint.get();
++
+ 	/**
+ 	 * Whether to render the colored background rectangle found in Adobe Animate.
+ 	 * Only available for Texture Atlases exported using BetterTextureAtlas.
+@@ -387,6 +399,12 @@ class FlxAnimate extends FlxSprite
+ 
+ 	function prepareDrawMatrix(matrix:FlxMatrix, camera:FlxCamera):Void
+ 	{
++		if (legacyFlxAnimateDraw && isAnimate)
++		{
++			prepareLegacyDrawMatrix(matrix, camera);
++			return;
++		}
++
+ 		final doStageMatrix:Bool = (isAnimate && applyStageMatrix);
+ 
+ 		if (doStageMatrix)
+@@ -452,6 +470,57 @@ class FlxAnimate extends FlxSprite
+ 		doAdditionalMatrixStuff(_matrix, camera);
+ 	}
+ 
++	function prepareLegacyDrawMatrix(matrix:FlxMatrix, camera:FlxCamera):Void
++	{
++		// old renderer: limb * instance (stage) matrix, then -origin, scale, skew, +position
++		final m = library.matrix;
++		matrix.concat(m);
++		matrix.translate(timeline._bounds.x * m.a, timeline._bounds.y * m.d);
++
++		matrix.translate(-legacyOrigin.x, -legacyOrigin.y);
++
++		// animation offsets and rotation behave like the regular path (mods rely on both)
++		if (frameOffsetAngle != null && frameOffsetAngle != angle)
++		{
++			var angleOff = (frameOffsetAngle - angle) * FlxAngle.TO_RAD;
++			var cos = Math.cos(angleOff);
++			var sin = Math.sin(angleOff);
++			matrix.rotateWithTrig(cos, -sin);
++			matrix.translate(-frameOffset.x, -frameOffset.y);
++			matrix.rotateWithTrig(cos, sin);
++		}
++		else
++			matrix.translate(-frameOffset.x, -frameOffset.y);
++
++		matrix.scale(scale.x, scale.y);
++
++		if (matrixExposed) matrix.concat(transformMatrix);
++		else
++		{
++			if (angle != 0)
++			{
++				updateTrig();
++				matrix.rotateWithTrig(_cosAngle, _sinAngle);
++			}
++			if (skew.x != 0 || skew.y != 0)
++			{
++				updateSkew();
++				matrix.concat(_skewMatrix);
++			}
++		}
++
++		getScreenPosition(_point, camera).subtractPoint(offset).add(legacyOrigin.x, legacyOrigin.y);
++		matrix.translate(_point.x, _point.y);
++
++		if (isPixelPerfectRender(camera))
++		{
++			matrix.tx = Math.floor(matrix.tx);
++			matrix.ty = Math.floor(matrix.ty);
++		}
++
++		doAdditionalMatrixStuff(_matrix, camera);
++	}
++
+ 	var stageBg:StageBG;
+ 
+ 	function drawStage(camera:FlxCamera):Void
+diff --git a/src/animate/internal/Frame.hx b/src/animate/internal/Frame.hx
+index aab458f..772cb93 100644
+--- a/src/animate/internal/Frame.hx
++++ b/src/animate/internal/Frame.hx
+@@ -492,8 +492,24 @@ class Frame implements IFlxDestroyable
+ 
+ 	public function draw(camera:FlxCamera, currentFrame:Int, parentMatrix:FlxMatrix, ?command:AnimateDrawCommand)
+ 	{
+-		if (command != null)
+-			command.prepareFrameCommand(this);
++		if (command == null)
++		{
++			_draw(camera, currentFrame, parentMatrix, command);
++			return;
++		}
++
++		// The command is shared by every layer of the timeline: keep this frame's color/blend
++		// to this frame, otherwise a colored (even empty) frame tints the layers drawn after it.
++		final prevTransform = command.transform;
++		final prevBlend = command.blend;
++		command.prepareFrameCommand(this);
++		_draw(camera, currentFrame, parentMatrix, command);
++		command.transform = prevTransform;
++		command.blend = prevBlend;
++	}
++
++	function _draw(camera:FlxCamera, currentFrame:Int, parentMatrix:FlxMatrix, ?command:AnimateDrawCommand)
++	{
+ 
+ 		if (_dirty)
+ 		{

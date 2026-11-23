@@ -1,0 +1,1405 @@
+diff --git a/src/lime/media/AudioDecoder.hx b/src/lime/media/AudioDecoder.hx
+new file mode 100644
+index 00000000..4d6929dd
+--- /dev/null
++++ b/src/lime/media/AudioDecoder.hx
+@@ -0,0 +1,231 @@
++package lime.media;
++
++import haxe.Int64;
++import haxe.io.Bytes;
++import lime._internal.format.Base64;
++import lime.utils.ArrayBuffer;
++#if (lime_cffi && !macro)
++#if lime_opus
++import lime.media.decoders.OpusDecoder;
++#end
++#if lime_vorbis
++import lime.media.decoders.VorbisDecoder;
++#end
++#if lime_drlibs
++import lime.media.decoders.WaveDecoder;
++import lime.media.decoders.MP3Decoder;
++import lime.media.decoders.FLACDecoder;
++#end
++#end
++
++@:access(lime.media.AudioBuffer)
++#if hl
++@:keep
++#end
++#if !lime_debug
++@:fileXml('tags="haxe,release"')
++@:noDebug
++#end
++
++/**
++	
++**/
++class AudioDecoder
++{
++	/**
++		The number of bits per sample in the audio decoder.
++	**/
++	public var bitsPerSample:Int;
++
++	/**
++		The number of audio channels (e.g., 1 for mono, 2 for stereo).
++	**/
++	public var channels:Int;
++
++	/**
++		Read-only variable to check if the decoder has reached end of buffer/file.
++	**/
++	public var eof:Bool;
++
++	/**
++		The sample rate of the audio data, in Hz.
++	**/
++	public var sampleRate:Int;
++
++	@:noCompletion private var __isDisposed:Bool;
++	@:noCompletion private var __bytes:Null<Bytes>;
++	@:noCompletion private var __path:Null<String>;
++
++	@:noCompletion private function new() {}
++
++	/**
++		Disposes of the resources used by this `AudioDecoder`, such as unloading any associated buffer or file.
++	**/
++	public function dispose():Void
++	{
++		eof = true;
++
++		__isDisposed = true;
++		__bytes = null;
++		__path = null;
++	}
++
++	/**
++		Clones this 'AudioDecoder'.
++	**/
++	public function clone():AudioDecoder
++	{
++		return null;
++	}
++
++	/**
++		Decodes to an audio data.
++
++		@param buffer An 'ArrayBuffer' to pass the decoded data to.
++		@param pos Offset in byte for the passed buffer.
++		@param len Length in byte to read to the passed buffer.
++		@param word What byte type to use to the passed buffer.
++		@return The number of bytes filled/read into the buffer.
++	**/
++	public function decode(buffer:ArrayBuffer, pos:Int, len:Int, word:Int):Int
++	{
++		return 0;
++	}
++
++	/**
++		Rewinds the decoder to the start of the buffer or file.
++	**/
++	public function rewind():Bool
++	{
++		return false;
++	}
++
++	/**
++		Sets the sample (Hz) position for the decoder to read.
++	**/
++	public function seek(samples:Int64):Bool
++	{
++		return false;
++	}
++
++	/**
++		Returns a boolean if this 'AudioDecoder' are able to use the 'seek' function.
++	**/
++	public function seekable():Bool
++	{
++		return false;
++	}
++
++	/**
++		Returns the current sample (Hz) position.
++	**/
++	public function tell():Int64
++	{
++		return 0;
++	}
++
++	/**
++		Returns the total of samples (Hz) for the decoder to read.
++	**/
++	public function total():Int64
++	{
++		return 0;
++	}
++
++	/**
++		Creates an `AudioDecoder` from a Base64-encoded string.
++
++		@param base64String The Base64-encoded audio data.
++		@return An `AudioDecoder` instance.
++	**/
++	public static function fromBase64(base64String:String):AudioDecoder
++	{
++		if (base64String == null) return null;
++
++		#if (lime_cffi && !macro)
++		var idx = base64String.indexOf(",");
++		var bytes:Bytes;
++		if (idx == -1)
++		{
++			bytes = Base64.decode(base64String);
++		}
++		else
++		{
++			bytes = Base64.decode(base64String.substr(idx + 1));
++		}
++
++		return AudioDecoder.fromBytes(bytes);
++		#else
++		return null;
++		#end
++	}
++
++	/**
++		Creates an `AudioDecoder` from a `Bytes` object.
++
++		@param bytes The `Bytes` object containing the encoded audio data.
++		@return An `AudioDecoder` instance.
++	**/
++	public static function fromBytes(bytes:Bytes):AudioDecoder
++	{
++		if (bytes == null) return null;
++
++		#if (lime_cffi && !macro)
++		return switch (AudioBuffer.__getCodecFromBytes(bytes))
++		{
++			#if lime_opus
++			case OPUS: OpusDecoder.fromBytes(bytes);
++			#end
++			#if lime_vorbis
++			case VORBIS: VorbisDecoder.fromBytes(bytes);
++			#end
++			#if lime_drlibs
++			case WAVE: WaveDecoder.fromBytes(bytes);
++			case MPEG: MP3Decoder.fromBytes(bytes);
++			case FLAC: FLACDecoder.fromBytes(bytes);
++			#end
++			default: null;
++		}
++		#else
++		return null;
++		#end
++	}
++
++	/**
++		Creates an `AudioDecoder` from a file.
++
++		@param path The file path to the audio asset file.
++		@return An `AudioDecoder` instance.
++	**/
++	public static function fromFile(path:String):AudioDecoder
++	{
++		if (path == null) return null;
++
++		#if (lime_cffi && !macro)
++		var decoder:AudioDecoder;
++
++		#if lime_opus
++		decoder = OpusDecoder.fromFile(path);
++		if (decoder != null) return decoder;
++		#end
++
++		#if lime_vorbis
++		decoder = VorbisDecoder.fromFile(path);
++		if (decoder != null) return decoder;
++		#end
++
++		#if lime_drlibs
++		decoder = WaveDecoder.fromFile(path);
++		if (decoder != null) return decoder;
++
++		decoder = MP3Decoder.fromFile(path);
++		if (decoder != null) return decoder;
++
++		decoder = FLACDecoder.fromFile(path);
++		if (decoder != null) return decoder;
++		#end
++		#end
++
++		return null;
++	}
++}
+\ No newline at end of file
+diff --git a/src/lime/media/AudioEffect.hx b/src/lime/media/AudioEffect.hx
+new file mode 100644
+index 00000000..6f08bb76
+--- /dev/null
++++ b/src/lime/media/AudioEffect.hx
+@@ -0,0 +1,153 @@
++package lime.media;
++
++#if lime_openal
++import lime.media.openal.AL;
++import lime.media.openal.ALAuxiliaryEffectSlot;
++import lime.media.openal.ALEffect;
++import lime.media.openal.ALFilter;
++import lime.media.openal.ALSource;
++#elseif (js && html5)
++import js.html.audio.AudioNode;
++#end
++
++#if !lime_debug
++@:fileXml('tags="haxe,release"')
++@:noDebug
++#end
++/**
++	Audio effects that can be used to apply to an audio source.
++
++	NOTE: Only works in web, and native targets, flash doesn't support this.
++**/
++class AudioEffect
++{
++	/**
++		Disables this audio effect.
++	**/
++	public var bypass(default, set):Bool;
++
++	/**
++		Should it dispose immediately if it has been unused.
++	**/
++	public var autoDispose:Bool = true;
++
++	@:allow(lime.media.AudioSource)
++	@:noCompletion private var __appliedSources:Array<AudioSource>;
++	#if lime_openal
++	@:noCompletion private var __alAux:Null<ALAuxiliaryEffectSlot>;
++	@:noCompletion private var __alEffect:Null<ALEffect>;
++	@:noCompletion private var __alFilter:Null<ALFilter>;
++	#elseif (js && html5)
++	@:noCompletion private var __audioNodes:Array<AudioNode>;
++	#end
++
++	/**
++		Creates a new `AudioEffect` instance.
++		Won't do anything since it haven't been implemented.
++	**/
++	public function new()
++	{
++		__appliedSources = [];
++
++		#if lime_openal
++		__alAux = AL.createAux();
++		#elseif (js && html5)
++		__audioNodes = [];
++		#end
++	}
++
++	/**
++		Releases any resources used by this `AudioEffect`.
++	**/
++	public function dispose():Void
++	{
++		if (__appliedSources == null) return;
++
++		if (!bypass)
++		{
++			for (source in __appliedSources) 
++			{
++				if (source != null)
++				{
++					source.removeEffect(this);
++			
++				}
++			}
++		}
++		__appliedSources = null;
++
++		#if lime_openal
++		if (__alAux != null)
++		{
++			AL.deleteAux(__alAux);
++			__alAux = null;
++		}
++
++		if (__alEffect != null)
++		{
++			AL.deleteEffect(__alEffect);
++			__alEffect = null;
++		}
++
++		if (__alFilter != null)
++		{
++			AL.deleteFilter(__alFilter);
++			__alFilter = null;
++		}
++		#elseif (js && html5)
++		if (__audioNodes != null)
++		{
++			for (node in __audioNodes)
++			{
++				node.disconnect();
++			}
++			__audioNodes = null;
++		}
++		#end
++	}
++
++	@:noCompletion private function __update():Void
++	{
++		if (!bypass)
++		{
++			for (source in __appliedSources)
++			{
++				if (source != null)
++				{
++					@:privateAccess
++					source.__backend.updateEffect(source.__effects.indexOf(this));
++				}
++			}
++		}
++	}
++
++	@:noCompletion private inline function set_bypass(value:Bool):Bool
++	{
++		if (value == bypass) return value;
++
++		if (value)
++		{
++			for (source in __appliedSources)
++			{
++				if (source != null)
++				{
++					@:privateAccess
++					source.__backend.addEffect(source.__effects.indexOf(this));
++				}
++			}
++		}
++		else
++		{
++			for (source in __appliedSources)
++			{
++				if (source != null)
++				{
++					@:privateAccess
++					source.__backend.removeEffect(source.__effects.indexOf(this));
++				}
++			}
++		}
++
++		return bypass = value;
++	}
++}
+\ No newline at end of file
+diff --git a/src/lime/media/decoders/FLACDecoder.hx b/src/lime/media/decoders/FLACDecoder.hx
+new file mode 100644
+index 00000000..fe72fa20
+--- /dev/null
++++ b/src/lime/media/decoders/FLACDecoder.hx
+@@ -0,0 +1,155 @@
++package lime.media.decoders;
++
++#if (!lime_doc_gen || lime_drlibs)
++import haxe.Int64;
++import haxe.io.Bytes;
++import lime.utils.ArrayBuffer;
++import lime.media.AudioDecoder;
++
++#if (lime_cffi && lime_drlibs)
++import lime._internal.backend.native.NativeCFFI;
++
++@:access(lime._internal.backend.native.NativeCFFI)
++#end
++#if hl
++@:keep
++#end
++#if !lime_debug
++@:fileXml('tags="haxe,release"')
++@:noDebug
++#end
++
++/**
++
++**/
++class FLACDecoder extends AudioDecoder
++{
++	public static function fromBytes(bytes:Bytes):FLACDecoder
++	{
++		#if (lime_cffi && lime_drlibs)
++		var handle = NativeCFFI.lime_drlibs_flac_from_bytes(bytes);
++		if (handle == null) return null;
++
++		var decoder = new FLACDecoder(handle);
++		decoder.__bytes = bytes;
++		return decoder;
++		#else
++		return null;
++		#end
++	}
++
++	public static function fromFile(path:String):FLACDecoder
++	{
++		#if (lime_cffi && lime_drlibs)
++		var handle = NativeCFFI.lime_drlibs_flac_from_file(path);
++		if (handle == null) return null;
++
++		var decoder = new FLACDecoder(handle);
++		decoder.__path = path;
++		return decoder;
++		#else
++		return null;
++		#end
++	}
++
++	@:noCompletion private var handle:Dynamic;
++
++	@:noCompletion private function new(handle:Dynamic)
++	{
++		super();
++		this.handle = handle;
++
++		#if (lime_cffi && lime_drlibs)
++		if (handle != null)
++		{
++			var data = NativeCFFI.lime_drlibs_flac_info(handle);
++			bitsPerSample = data.bitsPerSample;
++			channels = data.channels;
++			sampleRate = data.sampleRate;
++		}
++		#end
++	}
++
++	override function dispose():Void
++	{
++		super.dispose();
++		#if (lime_cffi && lime_drlibs)
++		if (handle != null) NativeCFFI.lime_drlibs_flac_close(handle);
++		#end
++		handle = null;
++	}
++
++	override function clone():FLACDecoder
++	{
++		#if (lime_cffi && lime_drlibs)
++		if (__path != null) return FLACDecoder.fromFile(__path);
++		else if (__bytes != null) return FLACDecoder.fromBytes(__bytes);
++		#end
++		return null;
++	}
++
++	override function decode(buffer:ArrayBuffer, pos:Int, len:Int, word:Int):Int
++	{
++		#if (lime_cffi && lime_drlibs)
++		pos = NativeCFFI.lime_drlibs_flac_decode(handle, buffer, pos, len, word);
++		eof = pos < len;
++		return pos;
++		#else
++		return 0;
++		#end
++	}
++
++	override function seek(samples:Int64):Bool
++	{
++		#if (lime_cffi && lime_drlibs)
++		if (NativeCFFI.lime_drlibs_flac_seek(handle, samples.low, samples.high) == 1)
++		{
++			eof = false;
++			return true;
++		}
++		#end
++		return false;
++	}
++
++	override function rewind():Bool
++	{
++		#if (lime_cffi && lime_drlibs)
++		if (NativeCFFI.lime_drlibs_flac_seek(handle, 0, 0) == 1)
++		{
++			eof = false;
++			return true;
++		}
++		#end
++		return false;
++	}
++
++	override function tell():Int64
++	{
++		#if (lime_cffi && lime_drlibs)
++		var data = NativeCFFI.lime_drlibs_flac_tell(handle);
++		return Int64.make(data.high, data.low);
++		#else
++		return Int64.ofInt(0);
++		#end
++	}
++
++	override function total():Int64
++	{
++		#if (lime_cffi && lime_drlibs)
++		var data = NativeCFFI.lime_drlibs_flac_total(handle);
++		return Int64.make(data.high, data.low);
++		#else
++		return Int64.ofInt(0);
++		#end
++	}
++
++	override function seekable():Bool
++	{
++		#if (lime_cffi && lime_drlibs)
++		return true;
++		#else
++		return false;
++		#end
++	}
++}
++#end
+\ No newline at end of file
+diff --git a/src/lime/media/decoders/MP3Decoder.hx b/src/lime/media/decoders/MP3Decoder.hx
+new file mode 100644
+index 00000000..ab40a56d
+--- /dev/null
++++ b/src/lime/media/decoders/MP3Decoder.hx
+@@ -0,0 +1,156 @@
++package lime.media.decoders;
++
++#if (!lime_doc_gen || lime_drlibs)
++import haxe.Int64;
++import haxe.io.Bytes;
++import lime.utils.ArrayBuffer;
++import lime.media.AudioDecoder;
++
++#if (lime_cffi && lime_drlibs)
++import lime._internal.backend.native.NativeCFFI;
++
++@:access(lime._internal.backend.native.NativeCFFI)
++#end
++#if hl
++@:keep
++#end
++#if !lime_debug
++@:fileXml('tags="haxe,release"')
++@:noDebug
++#end
++
++/**
++
++**/
++class MP3Decoder extends AudioDecoder
++{
++	public static function fromBytes(bytes:Bytes):MP3Decoder
++	{
++		#if (lime_cffi && lime_drlibs)
++		var handle = NativeCFFI.lime_drlibs_mp3_from_bytes(bytes);
++		if (handle == null) return null;
++
++		var decoder = new MP3Decoder(handle);
++		decoder.__bytes = bytes;
++		return decoder;
++		#else
++		return null;
++		#end
++	}
++
++	public static function fromFile(path:String):MP3Decoder
++	{
++		#if (lime_cffi && lime_drlibs)
++		var handle = NativeCFFI.lime_drlibs_mp3_from_file(path);
++		if (handle == null) return null;
++
++		var decoder = new MP3Decoder(handle);
++		decoder.__path = path;
++		return decoder;
++		#else
++		return null;
++		#end
++	}
++
++	@:noCompletion private var handle:Dynamic;
++
++	@:noCompletion private function new(handle:Dynamic)
++	{
++		super();
++		this.handle = handle;
++
++		#if (lime_cffi && lime_drlibs)
++		if (handle != null)
++		{
++			var data = NativeCFFI.lime_drlibs_mp3_info(handle);
++			bitsPerSample = 16;
++			channels = data.channels;
++			sampleRate = data.sampleRate;
++		}
++		#end
++	}
++
++	override function dispose():Void
++	{
++		super.dispose();
++		#if (lime_cffi && lime_drlibs)
++		if (handle != null) NativeCFFI.lime_drlibs_mp3_uninit(handle);
++		#end
++		handle = null;
++	}
++
++	override function clone():MP3Decoder
++	{
++		#if (lime_cffi && lime_drlibs)
++		if (__path != null) return MP3Decoder.fromFile(__path);
++		else if (__bytes != null) return MP3Decoder.fromBytes(__bytes);
++		#end
++		return null;
++	}
++
++	override function decode(buffer:ArrayBuffer, pos:Int, len:Int, word:Int):Int
++	{
++		#if (lime_cffi && lime_drlibs)
++		// Can only read as 16 bits per sample internally
++		pos = NativeCFFI.lime_drlibs_mp3_decode(handle, buffer, pos, len);
++		eof = pos < len;
++		return pos;
++		#else
++		return 0;
++		#end
++	}
++
++	override function seek(samples:Int64):Bool
++	{
++		#if (lime_cffi && lime_drlibs)
++		if (NativeCFFI.lime_drlibs_mp3_seek(handle, samples.low, samples.high) == 1)
++		{
++			eof = false;
++			return true;
++		}
++		#end
++		return false;
++	}
++
++	override function rewind():Bool
++	{
++		#if (lime_cffi && lime_drlibs)
++		if (NativeCFFI.lime_drlibs_mp3_seek(handle, 0, 0) == 1)
++		{
++			eof = false;
++			return true;
++		}
++		#end
++		return false;
++	}
++
++	override function tell():Int64
++	{
++		#if (lime_cffi && lime_drlibs)
++		var data = NativeCFFI.lime_drlibs_mp3_tell(handle);
++		return Int64.make(data.high, data.low);
++		#else
++		return Int64.ofInt(0);
++		#end
++	}
++
++	override function total():Int64
++	{
++		#if (lime_cffi && lime_drlibs)
++		var data = NativeCFFI.lime_drlibs_mp3_total(handle);
++		return Int64.make(data.high, data.low);
++		#else
++		return Int64.ofInt(0);
++		#end
++	}
++
++	override function seekable():Bool
++	{
++		#if (lime_cffi && lime_drlibs)
++		return true;
++		#else
++		return false;
++		#end
++	}
++}
++#end
+\ No newline at end of file
+diff --git a/src/lime/media/decoders/OpusDecoder.hx b/src/lime/media/decoders/OpusDecoder.hx
+new file mode 100644
+index 00000000..10a1f261
+--- /dev/null
++++ b/src/lime/media/decoders/OpusDecoder.hx
+@@ -0,0 +1,155 @@
++package lime.media.decoders;
++
++#if (!lime_doc_gen || lime_opus)
++import haxe.Int64;
++import haxe.io.Bytes;
++import lime.utils.ArrayBuffer;
++import lime.media.AudioDecoder;
++
++#if (lime_cffi && lime_opus)
++import lime._internal.backend.native.NativeCFFI;
++
++@:access(lime._internal.backend.native.NativeCFFI)
++#end
++#if hl
++@:keep
++#end
++#if !lime_debug
++@:fileXml('tags="haxe,release"')
++@:noDebug
++#end
++
++/**
++
++**/
++class OpusDecoder extends AudioDecoder
++{
++	public static function fromBytes(bytes:Bytes):OpusDecoder
++	{
++		#if (lime_cffi && lime_opus)
++		var handle = NativeCFFI.lime_opus_file_from_bytes(bytes);
++		if (handle == null) return null;
++
++		var decoder = new OpusDecoder(handle);
++		decoder.__bytes = bytes;
++		return decoder;
++		#else
++		return null;
++		#end
++	}
++
++	public static function fromFile(path:String):OpusDecoder
++	{
++		#if (lime_cffi && lime_opus)
++		var handle = NativeCFFI.lime_opus_file_from_file(path);
++		if (handle == null) return null;
++
++		var decoder = new OpusDecoder(handle);
++		decoder.__path = path;
++		return decoder;
++		#else
++		return null;
++		#end
++	}
++
++	@:noCompletion private var handle:Dynamic;
++
++	@:noCompletion private function new(handle:Dynamic)
++	{
++		super();
++		this.handle = handle;
++
++		#if (lime_cffi && lime_opus)
++		if (handle != null)
++		{
++			bitsPerSample = 16;
++			channels = NativeCFFI.lime_opus_file_channel_count(handle);
++			sampleRate = 48000;
++		}
++		#end
++	}
++
++	override function dispose():Void
++	{
++		super.dispose();
++		#if (lime_cffi && lime_opus)
++		if (handle != null) NativeCFFI.lime_opus_file_free(handle);
++		#end
++		handle = null;
++	}
++
++	override function clone():OpusDecoder
++	{
++		#if (lime_cffi && lime_opus)
++		if (__path != null) return OpusDecoder.fromFile(__path);
++		else if (__bytes != null) return OpusDecoder.fromBytes(__bytes);
++		#end
++		return null;
++	}
++
++	override function decode(buffer:ArrayBuffer, pos:Int, len:Int, word:Int):Int
++	{
++		#if (lime_cffi && lime_opus)
++		// Can only read as 16 bits per sample internally in libopus
++		pos = NativeCFFI.lime_opus_file_decode(handle, buffer, pos, len);
++		eof = pos < len;
++		return pos;
++		#else
++		return 0;
++		#end
++	}
++
++	override function seek(samples:Int64):Bool
++	{
++		#if (lime_cffi && lime_opus)
++		if (NativeCFFI.lime_opus_file_seek(handle, samples.low, samples.high) == 0)
++		{
++			eof = false;
++			return true;
++		}
++		#end
++		return false;
++	}
++
++	override function rewind():Bool
++	{
++		#if (lime_cffi && lime_opus)
++		if (NativeCFFI.lime_opus_file_seek(handle, 0, 0) == 0)
++		{
++			eof = false;
++			return true;
++		}
++		#end
++		return false;
++	}
++
++	override function tell():Int64
++	{
++		#if (lime_cffi && lime_opus)
++		var data = NativeCFFI.lime_opus_file_tell(handle);
++		return Int64.make(data.high, data.low);
++		#else
++		return Int64.ofInt(0);
++		#end
++	}
++
++	override function total():Int64
++	{
++		#if (lime_cffi && lime_opus)
++		var data = NativeCFFI.lime_opus_file_total(handle);
++		return Int64.make(data.high, data.low);
++		#else
++		return Int64.ofInt(0);
++		#end
++	}
++
++	override function seekable():Bool
++	{
++		#if (lime_cffi && lime_opus)
++		return NativeCFFI.lime_opus_file_seekable(handle);
++		#else
++		return false;
++		#end
++	}
++}
++#end
+\ No newline at end of file
+diff --git a/src/lime/media/decoders/VorbisDecoder.hx b/src/lime/media/decoders/VorbisDecoder.hx
+new file mode 100644
+index 00000000..3494c373
+--- /dev/null
++++ b/src/lime/media/decoders/VorbisDecoder.hx
+@@ -0,0 +1,173 @@
++package lime.media.decoders;
++
++#if (!lime_doc_gen || lime_vorbis)
++import haxe.Int64;
++import haxe.io.Bytes;
++import lime.utils.ArrayBuffer;
++import lime.media.AudioDecoder;
++
++#if (lime_cffi && lime_vorbis)
++import lime._internal.backend.native.NativeCFFI;
++import lime.media.vorbis.VorbisFile;
++
++@:access(lime._internal.backend.native.NativeCFFI)
++@:access(lime.media.vorbis.VorbisFile)
++#end
++#if hl
++@:keep
++#end
++#if !lime_debug
++@:fileXml('tags="haxe,release"')
++@:noDebug
++#end
++
++/**
++
++**/
++class VorbisDecoder extends AudioDecoder
++{
++	public static function fromBytes(bytes:Bytes):VorbisDecoder
++	{
++		#if (lime_cffi && lime_vorbis)
++		var handle = NativeCFFI.lime_vorbis_file_from_bytes(bytes);
++		if (handle == null) return null;
++
++		var decoder = new VorbisDecoder(handle);
++		decoder.__bytes = bytes;
++		return decoder;
++		#else
++		return null;
++		#end
++	}
++
++	public static function fromFile(path:String):VorbisDecoder
++	{
++		#if (lime_cffi && lime_vorbis)
++		var handle = NativeCFFI.lime_vorbis_file_from_file(path);
++		if (handle == null) return null;
++
++		var decoder = new VorbisDecoder(handle);
++		decoder.__path = path;
++		return decoder;
++		#else
++		return null;
++		#end
++	}
++
++	#if (lime_cffi && lime_vorbis)
++	public static function fromVorbisFile(vorbisFile:VorbisFile)
++	{
++		var decoder = new VorbisDecoder(vorbisFile.handle);
++		return decoder;
++	}
++	#else
++	public static function fromVorbisFile(vorbisFile:Dynamic)
++	{
++		return null;
++	}
++	#end
++
++	public var version:Int;
++
++	@:noCompletion private var handle:Dynamic;
++
++	@:noCompletion private function new(handle:Dynamic)
++	{
++		super();
++		this.handle = handle;
++
++		#if (lime_cffi && lime_vorbis)
++		if (handle != null)
++		{
++			var data = NativeCFFI.lime_vorbis_file_info(handle, -1);
++			bitsPerSample = 16;
++			channels = data.channels;
++			sampleRate = data.rate;
++			version = data.version;
++		}
++		#end
++	}
++
++	override function dispose():Void
++	{
++		super.dispose();
++		#if (lime_cffi && lime_vorbis)
++		if (handle != null) NativeCFFI.lime_vorbis_file_clear(handle);
++		#end
++		handle = null;
++	}
++
++	override function clone():VorbisDecoder
++	{
++		#if (lime_cffi && lime_vorbis)
++		if (__path != null) return VorbisDecoder.fromFile(__path);
++		else if (__bytes != null) return VorbisDecoder.fromBytes(__bytes);
++		#end
++		return null;
++	}
++
++	override function decode(buffer:ArrayBuffer, pos:Int, len:Int, word:Int):Int
++	{
++		#if (lime_cffi && lime_vorbis)
++		pos = NativeCFFI.lime_vorbis_file_decode(handle, buffer, pos, len, word);
++		eof = pos < len;
++		return pos;
++		#else
++		return 0;
++		#end
++	}
++
++	override function seek(samples:Int64):Bool
++	{
++		#if (lime_cffi && lime_vorbis)
++		if (NativeCFFI.lime_vorbis_file_pcm_seek(handle, samples.low, samples.high) == 0)
++		{
++			eof = false;
++			return true;
++		}
++		#end
++		return false;
++	}
++
++	override function rewind():Bool
++	{
++		#if (lime_cffi && lime_vorbis)
++		if (NativeCFFI.lime_vorbis_file_raw_seek(handle, 0, 0) == 0)
++		{
++			eof = false;
++			return true;
++		}
++		#end
++		return false;
++	}
++
++	override function tell():Int64
++	{
++		#if (lime_cffi && lime_vorbis)
++		var data = NativeCFFI.lime_vorbis_file_pcm_tell(handle);
++		return Int64.make(data.high, data.low);
++		#else
++		return Int64.ofInt(0);
++		#end
++	}
++
++	override function total():Int64
++	{
++		#if (lime_cffi && lime_vorbis)
++		var data = NativeCFFI.lime_vorbis_file_pcm_total(handle, -1);
++		return Int64.make(data.high, data.low);
++		#else
++		return Int64.ofInt(0);
++		#end
++	}
++
++	override function seekable():Bool
++	{
++		#if (lime_cffi && lime_vorbis)
++		return NativeCFFI.lime_vorbis_file_seekable(handle);
++		#else
++		return false;
++		#end
++	}
++}
++#end
+\ No newline at end of file
+diff --git a/src/lime/media/decoders/WaveDecoder.hx b/src/lime/media/decoders/WaveDecoder.hx
+new file mode 100644
+index 00000000..61117da3
+--- /dev/null
++++ b/src/lime/media/decoders/WaveDecoder.hx
+@@ -0,0 +1,155 @@
++package lime.media.decoders;
++
++#if (!lime_doc_gen || lime_drlibs)
++import haxe.Int64;
++import haxe.io.Bytes;
++import lime.utils.ArrayBuffer;
++import lime.media.AudioDecoder;
++
++#if (lime_cffi && lime_drlibs)
++import lime._internal.backend.native.NativeCFFI;
++
++@:access(lime._internal.backend.native.NativeCFFI)
++#end
++#if hl
++@:keep
++#end
++#if !lime_debug
++@:fileXml('tags="haxe,release"')
++@:noDebug
++#end
++
++/**
++
++**/
++class WaveDecoder extends AudioDecoder
++{
++	public static function fromBytes(bytes:Bytes):WaveDecoder
++	{
++		#if (lime_cffi && lime_drlibs)
++		var handle = NativeCFFI.lime_drlibs_wav_from_bytes(bytes);
++		if (handle == null) return null;
++
++		var decoder = new WaveDecoder(handle);
++		decoder.__bytes = bytes;
++		return decoder;
++		#else
++		return null;
++		#end
++	}
++
++	public static function fromFile(path:String):WaveDecoder
++	{
++		#if (lime_cffi && lime_drlibs)
++		var handle = NativeCFFI.lime_drlibs_wav_from_file(path);
++		if (handle == null) return null;
++
++		var decoder = new WaveDecoder(handle);
++		decoder.__path = path;
++		return decoder;
++		#else
++		return null;
++		#end
++	}
++
++	@:noCompletion private var handle:Dynamic;
++
++	@:noCompletion private function new(handle:Dynamic)
++	{
++		super();
++		this.handle = handle;
++
++		#if (lime_cffi && lime_drlibs)
++		if (handle != null)
++		{
++			var data = NativeCFFI.lime_drlibs_wav_info(handle);
++			bitsPerSample = data.bitsPerSample;
++			channels = data.channels;
++			sampleRate = data.sampleRate;
++		}
++		#end
++	}
++
++	override function dispose():Void
++	{
++		super.dispose();
++		#if (lime_cffi && lime_drlibs)
++		if (handle != null) NativeCFFI.lime_drlibs_wav_uninit(handle);
++		#end
++		handle = null;
++	}
++
++	override function clone():WaveDecoder
++	{
++		#if (lime_cffi && lime_drlibs)
++		if (__path != null) return WaveDecoder.fromFile(__path);
++		else if (__bytes != null) return WaveDecoder.fromBytes(__bytes);
++		#end
++		return null;
++	}
++
++	override function decode(buffer:ArrayBuffer, pos:Int, len:Int, word:Int):Int
++	{
++		#if (lime_cffi && lime_drlibs)
++		pos = NativeCFFI.lime_drlibs_wav_decode(handle, buffer, pos, len, word);
++		eof = pos < len;
++		return pos;
++		#else
++		return 0;
++		#end
++	}
++
++	override function seek(samples:Int64):Bool
++	{
++		#if (lime_cffi && lime_drlibs)
++		if (NativeCFFI.lime_drlibs_wav_seek(handle, samples.low, samples.high) == 1)
++		{
++			eof = false;
++			return true;
++		}
++		#end
++		return false;
++	}
++
++	override function rewind():Bool
++	{
++		#if (lime_cffi && lime_drlibs)
++		if (NativeCFFI.lime_drlibs_wav_seek(handle, 0, 0) == 1)
++		{
++			eof = false;
++			return true;
++		}
++		#end
++		return false;
++	}
++
++	override function tell():Int64
++	{
++		#if (lime_cffi && lime_drlibs)
++		var data = NativeCFFI.lime_drlibs_wav_tell(handle);
++		return Int64.make(data.high, data.low);
++		#else
++		return Int64.ofInt(0);
++		#end
++	}
++
++	override function total():Int64
++	{
++		#if (lime_cffi && lime_drlibs)
++		var data = NativeCFFI.lime_drlibs_wav_total(handle);
++		return Int64.make(data.high, data.low);
++		#else
++		return Int64.ofInt(0);
++		#end
++	}
++
++	override function seekable():Bool
++	{
++		#if (lime_cffi && lime_drlibs)
++		return true;
++		#else
++		return false;
++		#end
++	}
++}
++#end
+\ No newline at end of file
+diff --git a/src/lime/ui/FileDialogFilter.hx b/src/lime/ui/FileDialogFilter.hx
+new file mode 100644
+index 00000000..39f3f917
+--- /dev/null
++++ b/src/lime/ui/FileDialogFilter.hx
+@@ -0,0 +1,33 @@
++package lime.ui;
++
++/**
++	Represents a file filter for use in file dialogs, consisting of a display name and a pattern.
++	Patterns use semicolons to separate multiple extensions, for example `"png;jpg;jpeg"`.
++**/
++@:structInit
++class FileDialogFilter
++{
++	/**
++		The display name of the filter, shown in the dialog's filter dropdown.
++		For example, `"PNG images"`.
++	**/
++	public var name:String;
++
++	/**
++		The pattern used to match files.
++		Use semicolons to separate multiple extensions.
++		For example, `"png;jpg;jpeg"` or `"*"` for all files.
++	**/
++	public var pattern:String;
++
++	/**
++		Creates a new `FileDialogFilter` with the given display name and pattern.
++		@param name    The display name of the filter, shown in the dialog's filter dropdown.
++		@param pattern The pattern used to match files. Use semicolons to separate multiple extensions, for example `"png;jpg;jpeg"`.
++	**/
++	public function new(name:String, pattern:String)
++	{
++		this.name = name;
++		this.pattern = pattern;
++	}
++}
+diff --git a/templates/cpp/static/Main.cpp b/templates/cpp/static/Main.cpp
+index ebb3820a..819497b1 100644
+--- a/templates/cpp/static/Main.cpp
++++ b/templates/cpp/static/Main.cpp
+@@ -2,13 +2,76 @@
+ 
+ #if defined(__SWITCH__)
+ #include "switch.h"
++#include <hxcpp.h>
+ #include <unistd.h>
++#include <malloc.h>
++#include <errno.h>
++#include <pthread.h>
++extern "C" void cne_mem_info(unsigned long long *used, unsigned long long *total) {
++	// newlib reserves the whole heap up front, so ask malloc how much is really in use
++	struct mallinfo mi = mallinfo();
++	u64 t = 0;
++	svcGetInfo(&t, InfoType_TotalMemorySize, CUR_PROCESS_HANDLE, 0);
++	*used = (unsigned long long)mi.uordblks; *total = t;
++}
++static void cneBootLog(const char *message) {
++	FILE *log = fopen("sdmc:/switch/cne-port-boot.log", "a");
++	if (log) { fprintf(log, "%s\n", message); fclose(log); }
++}
+ #endif
+ 
+ #if defined(HX_WINDOWS) && !defined(HXCPP_DEBUGGER)
+ #include <windows.h>
+ #endif
+ 
++#if defined(__SWITCH__)
++// Watchdog: a native thread that keeps one log file open and records, every 2 seconds,
++// whether the main loop is alive and what the audio is doing (diagnostics only).
++extern "C" volatile unsigned long long cne_frame_counter;
++extern "C" volatile int cne_music_ms;
++extern "C" volatile int cne_vocals_ms;
++extern "C" volatile int cne_audio_flags;
++extern "C" volatile int cne_volumes;
++volatile int cne_volumes = -1;
++volatile int cne_music_ms = -1;
++volatile int cne_vocals_ms = -1;
++volatile int cne_audio_flags = 0;
++static void *cneWatchdog(void *) {
++	FILE *log = fopen("sdmc:/switch/cne-watchdog.log", "w");
++	if (!log) return nullptr;
++	unsigned long long lastFrames = 0;
++	for (int tick = 0;; tick++) {
++		svcSleepThread(2000000000ULL);
++		struct mallinfo mi = mallinfo();
++		// can a new file still be opened? (detects running out of file handles)
++		int openErr = 0;
++		FILE *probe = fopen("sdmc:/switch/cne-fdprobe.tmp", "w");
++		if (probe) fclose(probe); else openErr = errno;
++		unsigned long long frames = cne_frame_counter;
++		fprintf(log, "t=%ds frames=%llu (+%llu) heap=%dMB music=%dms vocals=%dms flags=%d openErr=%d vol(master/music/vocals/muted)=%d/%d/%d/%d\n", (tick + 1) * 2, frames, frames - lastFrames, (int)(mi.uordblks >> 20), cne_music_ms, cne_vocals_ms, cne_audio_flags, openErr, (cne_volumes >> 0) & 255, (cne_volumes >> 8) & 255, (cne_volumes >> 16) & 255, (cne_volumes >> 24) & 1);
++		fflush(log);
++		lastFrames = frames;
++	}
++	return nullptr;
++}
++#endif
++
++#if defined(__SWITCH__)
++// Shows the system keyboard (blocking). Returns 1 with the text in `out`, 0 if cancelled, -1 on error.
++extern "C" int cne_swkbd(const char *initial, const char *guide, char *out, int outLen) {
++	SwkbdConfig kbd;
++	if (R_FAILED(swkbdCreate(&kbd, 0))) return -1;
++	swkbdConfigMakePresetDefault(&kbd);
++	if (initial && initial[0]) swkbdConfigSetInitialText(&kbd, initial);
++	if (guide && guide[0]) swkbdConfigSetGuideText(&kbd, guide);
++	swkbdConfigSetStringLenMax(&kbd, outLen - 1);
++	out[0] = 0;
++	Result rc = swkbdShow(&kbd, out, outLen);
++	swkbdClose(&kbd);
++	return R_SUCCEEDED(rc) ? 1 : 0;
++}
++#endif
++
+ extern "C" const char *hxRunLibrary ();
+ extern "C" void hxcpp_set_top_of_stack ();
+ 
+@@ -61,6 +124,8 @@ int __stdcall WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmd
+ extern "C" int main(int argc, char *argv[]) {
+ #endif
+ #if defined(__SWITCH__)
++	fsdevMountSdmc();
++	cneBootLog("main entered");
+ 	// We need to initialize the socket even if we're not going to use it with nxlink
+ 	// Haxe needs to be able to handle their own sockets, if we don't do this it will crash
+ 	Result result = socketInitializeDefault();
+@@ -71,6 +136,7 @@ extern "C" int main(int argc, char *argv[]) {
+ 	}
+ 
+ 	initNXLink();
++	cneBootLog("socket and nxlink initialized");
+ 
+ 	Result rc = romfsInit();
+ 	if (R_FAILED(rc))
+@@ -79,18 +145,40 @@ extern "C" int main(int argc, char *argv[]) {
+ 	{
+ 		printf("[Main.cpp - romfsInit()] RomFS Init Successful!\n");
+ 	}
++	cneBootLog(R_FAILED(rc) ? "romfsInit failed" : "romfsInit succeeded");
+ #endif
+ 
++	#if defined(__SWITCH__)
++	cneBootLog("before hxcpp runtime registration");
++	#endif
+ 	hxcpp_set_top_of_stack ();
+ 	
+ 	zlib_register_prims ();
++	#if !defined(__SWITCH__)
+ 	lime_cairo_register_prims ();
++	#endif
+ 	lime_openal_register_prims ();
+ 	::foreach ndlls::::if (registerStatics)::
+ 	::nameSafe::_register_prims ();::end::::end::
++	#if defined(__SWITCH__)
++	cneBootLog("before hxRunLibrary");
++	{
++		pthread_t watchdog;
++		pthread_create(&watchdog, nullptr, cneWatchdog, nullptr);
++		pthread_detach(watchdog);
++	}
++	#endif
+ 	
+ 	const char *err = NULL;
+  	err = hxRunLibrary ();
++	#if defined(__SWITCH__)
++	cneBootLog(err ? err : "hxRunLibrary returned success");
++	if (err) {
++		Array<String> frames = __hxcpp_get_exception_stack();
++		for (int i = 0; i < frames->length; ++i)
++			cneBootLog(frames[i].__s);
++	}
++	#endif
+ 	
+ 	if (err) {
+ 		printf("[Main.cpp - hxRunLibrary()] ERROR: %s\n", err);

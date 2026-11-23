@@ -47,6 +47,11 @@ class StrumLine extends FlxTypedGroup<Strum> {
 	 */
 	public var cpu(default, set):Bool = false;
 	/**
+	 * Botplay: this player strumline hits every note by itself (always Sick) and ignores input.
+	 * Unlike `cpu`, hits still go through the player path (ratings, splashes, combo).
+	 */
+	public var botplay(default, set):Bool = false;
+	/**
 	 * Whenever this strumline is from the opponent side or the player side.
 	 */
 	public var opponentSide:Bool = false;
@@ -250,7 +255,7 @@ class StrumLine extends FlxTypedGroup<Strum> {
 				daNote.tooLate = true;
 		}
 
-		if (cpu && __updateNote_event.__autoCPUHit && !daNote.avoid && !daNote.wasGoodHit && daNote.strumTime < __updateNote_songPos) {
+		if ((cpu || botplay) && __updateNote_event.__autoCPUHit && !daNote.avoid && !daNote.wasGoodHit && daNote.strumTime < __updateNote_songPos) {
 			if (PlayState.instance != null) PlayState.instance.goodNoteHit(this, daNote);
 			else __dispatchOnHit(daNote);
 		}
@@ -261,7 +266,7 @@ class StrumLine extends FlxTypedGroup<Strum> {
 		}
 
 		if (daNote.tooLate) {
-			if (!cpu) {
+			if (!cpu && !botplay) { // botplay skips "avoid" notes on purpose; letting them pass is not a miss
 				if (PlayState.instance != null) PlayState.instance.noteMiss(this, daNote);
 				else __dispatchOnMiss(daNote);
 			}
@@ -321,7 +326,7 @@ class StrumLine extends FlxTypedGroup<Strum> {
 	public function updateInput(id:Int = 0) {
 		updateNotes();
 
-		if (cpu) return;
+		if (cpu || botplay) return;
 
 		final membersLength = members.length;
 
@@ -470,7 +475,7 @@ class StrumLine extends FlxTypedGroup<Strum> {
 			babyArrow.animation.addByPrefix('confirm', '${event.animPrefix} confirm', 24, false);
 		}
 
-		babyArrow.cpu = cpu;
+		babyArrow.cpu = cpu || botplay;
 		babyArrow.updateHitbox();
 		babyArrow.scrollFactor.set();
 
@@ -528,6 +533,13 @@ class StrumLine extends FlxTypedGroup<Strum> {
 	 * SETTERS & GETTERS
 	 */
 	#if REGION
+	private function set_botplay(b:Bool):Bool {
+		// strums release on their own like the cpu's, since nobody is holding the buttons
+		for (s in members)
+			if (s != null)
+				s.cpu = b || cpu;
+		return botplay = b;
+	}
 	private inline function set_cpu(b:Bool):Bool {
 		for(s in members)
 			if (s != null)

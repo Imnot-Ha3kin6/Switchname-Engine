@@ -70,6 +70,8 @@ class FreeplayState extends MusicBeatState
 	 * Text containing the current coop/opponent mode ([KEYBINDS] Co-Op mode)
 	 */
 	public var coopText:FlxText;
+	/** "[Y] Botplay: ON/OFF" line under the mode text. */
+	public var botplayText:FlxText;
 
 	/**
 	 * Currently lerped score. Is updated to go towards `intendedScore`.
@@ -202,6 +204,11 @@ class FreeplayState extends MusicBeatState
 		coopText.font = scoreText.font;
 		add(coopText);
 
+		botplayText = new FlxText(diffText.x, coopText.y, 0, "", 24);
+		botplayText.font = scoreText.font;
+		add(botplayText);
+		updateBotplayText();
+
 		add(scoreText);
 
 		changeSelection(0, true);
@@ -267,6 +274,12 @@ class FreeplayState extends MusicBeatState
 
 			changeDiff((controls.LEFT_P ? -1 : 0) + (controls.RIGHT_P ? 1 : 0));
 			changeCoopMode((controls.CHANGE_MODE ? 1 : 0)); // TODO: make this configurable
+			if (botplayTogglePressed()) {
+				Options.botplay = !Options.botplay;
+				Options.save();
+				updateBotplayText();
+				CoolUtil.playMenuSFX(SCROLL, 0.7);
+			}
 			// putting it before so that its actually smooth
 
 			if (FlxG.mouse.justPressed && grpSongs != null) {
@@ -283,11 +296,12 @@ class FreeplayState extends MusicBeatState
 		}
 
 		scoreText.text = TEXT_FREEPLAY_SCORE.format([Math.round(lerpScore)]);
-		scoreBG.scale.set(MathUtil.maxSmart(diffText.width, scoreText.width, coopText.width) + 8, (coopText.visible ? coopText.y + coopText.height : 66));
+		botplayText.y = coopText.visible ? coopText.y + coopText.height : coopText.y;
+		scoreBG.scale.set(MathUtil.maxSmart(diffText.width, scoreText.width, coopText.width, botplayText.width) + 8, botplayText.y + botplayText.height);
 		scoreBG.updateHitbox();
 		scoreBG.x = FlxG.width - scoreBG.width;
 
-		scoreText.x = coopText.x = scoreBG.x + 4;
+		scoreText.x = coopText.x = botplayText.x = scoreBG.x + 4;
 		diffText.x = Std.int(scoreBG.x + ((scoreBG.width - diffText.width) / 2));
 
 		interpColor.fpsLerpTo(curSong.color, 0.0625);
@@ -354,6 +368,19 @@ class FreeplayState extends MusicBeatState
 
 	var __opponentMode:Bool = false;
 	var __coopMode:Bool = false;
+
+	function updateBotplayText() {
+		botplayText.text = "[Y] Botplay: " + (Options.botplay ? "ON" : "OFF");
+		botplayText.color = Options.botplay ? 0xFF55FF55 : 0xFFFFFFFF;
+	}
+
+	function botplayTogglePressed():Bool {
+		if (FlxG.keys.justPressed.B) return true;
+		if (FlxG.gamepads != null)
+			for (pad in FlxG.gamepads.getActiveGamepads())
+				if (pad.justPressed.X) return true; // the button labelled Y on Switch controllers
+		return false;
+	}
 
 	function updateCoopModes() {
 		__opponentMode = false;

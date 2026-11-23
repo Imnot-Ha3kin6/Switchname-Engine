@@ -18,6 +18,7 @@ class ModSwitchMenu extends MusicBeatSubstate {
 	var keyInfo:FunkinText;
 
 	var mods:Array<String> = [];
+	var modNames:Array<String> = [];
 	var addons:Array<String> = [];
 	var modConf:Array<Map<String, Map<String, String>>> = [];
 	// var addonConf:Array<Map<String, Map<String, String>>> = []; maybe, i'd just need to add a `folder` in ModsFolder.getModConfig()
@@ -76,7 +77,8 @@ class ModSwitchMenu extends MusicBeatSubstate {
 			if (name == "YOUR MOD NAME HERE")
 				name = mod;
 
-			var a = new Alphabet(0, 0, name, "bold");
+			modNames.push(name);
+			var a = new Alphabet(0, 0, menuLabel(mod, name), "bold");
 			if(mod == ModsFolder.currentModFolder) {
 				a.effects = [new funkin.menus.ui.effects.ColorWaveEffect(0xFFFFFFFF, 0xFF00FF00, 10)];
 				a.effects[0].speed = 10;
@@ -134,7 +136,7 @@ class ModSwitchMenu extends MusicBeatSubstate {
 		title = new FunkinText(4, 4, FlxG.width - 8, TU.translate("mods.modsTitle"), 32);
 		title.borderSize = 1.25;
 		add(title);
-		desc = new FunkinText(4, title.y + title.height, FlxG.width - 8, getDescription(modConf[curSelected]), 16);
+		desc = new FunkinText(4, title.y + title.height, FlxG.width - 8, "", 16);
 		add(desc);
 
 		keyInfo = new FunkinText(FlxG.width - 4, title.y + title.height * 0.5, 0, '[${CoolUtil.keyToString(Options.SOLO_CHANGE_MODE[0])}] >>>', 24);
@@ -186,6 +188,11 @@ class ModSwitchMenu extends MusicBeatSubstate {
 	function regularControls(scrollChange:Int) {
 		changeSelection(scrollChange);
 
+		if (toggleCustomMenusPressed()) {
+			toggleCustomMenus();
+			return;
+		}
+
 		if (controls.ACCEPT) {
 			var newAddonsOff:Array<String> = [];
 			for (i => isOff in queuedAddonsOff) {
@@ -232,8 +239,45 @@ class ModSwitchMenu extends MusicBeatSubstate {
 		}
 		alphabets.members[curSelected].alpha = 1;
 
-		desc.text = getDescription(modConf[curSelected]);
+		desc.text = describeSelected();
 	}
+
+	/** Custom menus toggle: mods listed in Options.modsWithoutCustomMenus use Codename's default menus. */
+	inline function customMenusOn(mod:String):Bool
+		return mod == null || !Options.modsWithoutCustomMenus.contains(mod);
+
+	function menuLabel(mod:String, name:String):String
+		return customMenusOn(mod) ? name : name + " (DEFAULT MENUS)";
+
+	function describeSelected():String {
+		var text = getDescription(modConf[curSelected]);
+		var mod = mods[curSelected];
+		if (mod != null) {
+			var status = customMenusOn(mod) ? "Custom menus: ON" : "Custom menus: OFF (default Codename menus)";
+			text = (text != "" ? text + "\n" : "") + status + "  -  [Y] toggle";
+		}
+		return text;
+	}
+
+	function toggleCustomMenus() {
+		var mod = mods[curSelected];
+		if (mod == null) return;
+		if (customMenusOn(mod)) Options.modsWithoutCustomMenus.push(mod);
+		else Options.modsWithoutCustomMenus.remove(mod);
+		Options.save();
+		alphabets.members[curSelected].text = menuLabel(mod, modNames[curSelected]);
+		desc.text = describeSelected();
+		CoolUtil.playMenuSFX(CONFIRM, 0.7);
+	}
+
+	function toggleCustomMenusPressed():Bool {
+		if (FlxG.keys.justPressed.M) return true;
+		if (FlxG.gamepads != null)
+			for (pad in FlxG.gamepads.getActiveGamepads())
+				if (pad.justPressed.X) return true; // the button labelled Y on Switch controllers
+		return false;
+	}
+
 	public function changeAddon(change:Int, force:Bool = false) {
 		if (change == 0 && !force) return;
 
@@ -267,7 +311,7 @@ class ModSwitchMenu extends MusicBeatSubstate {
 			title.alignment = desc.alignment = LEFT;
 
 			title.text = TU.translate("mods.modsTitle");
-			desc.text = getDescription(modConf[curSelected]);
+			desc.text = describeSelected();
 		}
 
 		keyInfo.text = '[${CoolUtil.keyToString(Options.SOLO_CHANGE_MODE[0])}]';

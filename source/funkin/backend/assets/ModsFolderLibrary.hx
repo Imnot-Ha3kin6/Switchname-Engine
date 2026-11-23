@@ -74,6 +74,10 @@ class ModsFolderLibrary extends AssetLibrary implements IModsAssetLibrary {
 		editedTimes[id] = FileSystem.stat(path).mtime.getTime();
 
 		var e = Image.fromFile(path);
+		#if switch
+		if (e == null) openfl.CneBootLog.trace('[img] FAILED to decode $path mem=' + openfl.CneBootLog.mem());
+		else if (e.width * e.height >= 2048 * 2048) openfl.CneBootLog.trace('[img] decoded ${e.width}x${e.height} $path mem=' + openfl.CneBootLog.mem());
+		#end
 		return e;
 	}
 

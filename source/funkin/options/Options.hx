@@ -223,6 +223,41 @@ class Options
 	public static var P2_DEV_INSPECTOR:Array<FlxKey> = [];
 
 	/**
+	* CONTROLLER BINDINGS (two slots each, FlxGamepadInputID values, -1 = unbound).
+	* Defaults mirror `GamepadBinds.getDefaults()`; see that class for the Switch button names.
+	*/
+	public static var GAMEPAD_NOTE_LEFT:Array<Int> = [13, 2];
+	public static var GAMEPAD_NOTE_DOWN:Array<Int> = [12, 0];
+	public static var GAMEPAD_NOTE_UP:Array<Int> = [11, 3];
+	public static var GAMEPAD_NOTE_RIGHT:Array<Int> = [14, 1];
+	public static var GAMEPAD_LEFT:Array<Int> = [13, 37];
+	public static var GAMEPAD_DOWN:Array<Int> = [12, 36];
+	public static var GAMEPAD_UP:Array<Int> = [11, 34];
+	public static var GAMEPAD_RIGHT:Array<Int> = [14, 35];
+	public static var GAMEPAD_ACCEPT:Array<Int> = [1, -1];
+	public static var GAMEPAD_BACK:Array<Int> = [0, -1];
+	public static var GAMEPAD_PAUSE:Array<Int> = [7, -1];
+	public static var GAMEPAD_RESET:Array<Int> = [-1, -1];
+	public static var GAMEPAD_CHANGE_MODE:Array<Int> = [6, -1];
+	public static var GAMEPAD_SWITCHMOD:Array<Int> = [4, -1];
+	public static var GAMEPAD_FPS_COUNTER:Array<Int> = [-1, -1];
+	/**
+	 * Mods whose custom menus are turned off: their title/main menu/freeplay/story/options takeovers
+	 * are ignored and Codename's default menus are used (songs and scripts still load).
+	 * Toggled per mod in the mod switch menu.
+	 */
+	public static var modsWithoutCustomMenus:Array<String> = [];
+
+	/** Resolution (percent) of full-screen shader effects on cameras; lower is faster but softer. */
+	public static var screenEffectsResolution:Int = #if switch 75 #else 100 #end;
+
+	/** Botplay: songs play themselves (every note Sick), input is ignored and no score or highscore is kept. */
+	public static var botplay:Bool = false;
+
+	/** Analog stick dead zone for controllers, in percent. */
+	public static var gamepadDeadZone:Int = 25;
+
+	/**
 	* SOLO GETTERS
 	*/
 
@@ -287,6 +322,7 @@ class Options
 
 	public static function applySettings() {
 		applyKeybinds();
+		applyScreenEffectsResolution();
 		applyQuality();
 		applyFramePacerMode();
 
@@ -301,6 +337,10 @@ class Options
 			ImGuiIO.configFlags = ImGuiIO.configFlags & ~ImGuiConfigFlags.ViewportsEnable;
 		}
 		#end
+	}
+
+	public static function applyScreenEffectsResolution() {
+		openfl.display.DisplayObjectRenderer.filterResolution = FlxMath.bound(screenEffectsResolution, 25, 100) / 100;
 	}
 
 	public static function applyFramePacerMode() {
@@ -330,6 +370,10 @@ class Options
 		PlayerSettings.solo.setKeyboardScheme(Solo);
 		PlayerSettings.player1.setKeyboardScheme(Duo(true));
 		PlayerSettings.player2.setKeyboardScheme(Duo(false));
+
+		#if switch
+		GamepadBinds.apply();
+		#end
 
 		FlxG.sound.volumeUpKeys = SOLO_VOLUME_UP;
 		FlxG.sound.volumeDownKeys = SOLO_VOLUME_DOWN;

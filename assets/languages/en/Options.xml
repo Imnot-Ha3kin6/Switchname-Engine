@@ -10,6 +10,9 @@
 		<str id="optionsTree.controls-name">Controls</str>
 		<str id="optionsTree.controls-desc">Change Controls for Player 1 and Player 2!</str>
 
+		<str id="optionsTree.controller-name">Controller</str>
+		<str id="optionsTree.controller-desc">Rebind controller buttons and change controller settings.</str>
+
 		<str id="optionsTree.gameplay-name">Gameplay</str>
 		<str id="optionsTree.gameplay-desc">Change Gameplay options such as Downscroll, Scroll Speed, Naughtyness...</str>
 		<str id="optionsTree.gameplay.advanced-desc">Change more advanced options such as Streaming Audio...</str>
@@ -66,6 +69,9 @@
 	</group>
 
 	<group name="AppearanceOptions" prefix="AppearanceOptions.">
+		<str id="Advanced.screenEffectsResolution-name">Screen Effects Resolution</str>
+		<str id="Advanced.screenEffectsResolution-desc">Resolution (%) for full-screen shader effects that mods put on cameras (bloom, CRT, glitch, color grading...). Lower is much faster but softer while an effect is on.</str>
+
 		<str id="framePacer-name">Pacer</str>
 		<str id="framePacer-desc">Display matches the frame rate to your monitor's refresh rate and enables scanline sync and submit alignment; the Framerate option is disabled while it is active. Adaptive enables them only when the frame rate matches the refresh rate or a whole division of it (1/2, 1/4...). Off restores the previous behavior. Unlimited removes the frame rate cap entirely. Sync costs about 0.3 ms of input latency: in fullscreen the tear line stays pinned to the screen edge, out of view, and in windowed mode every frame is shown instead of stuttering.</str>
 		<str id="framePacer-off">Off</str>
@@ -133,6 +139,9 @@
 	</group>
 
 	<group name="GameplayOptions" prefix="GameplayOptions.">
+		<str id="botplay-name">Botplay</str>
+		<str id="botplay-desc">Songs play themselves: every note is hit as a Sick, your input is ignored, and the score stays at 0 (no highscore is saved). Also toggled with Y in Freeplay.</str>
+
 		<str id="downscroll-name">Downscroll</str>
 		<str id="downscroll-desc">If checked, notes will go from up to down instead of down to up, as if they're falling.</str>
 
@@ -175,6 +184,18 @@
 	<group name="LanguageOptions" prefix="LanguageOptions.">
 		<str id="language-name">Language</str>
 		<str id="language-desc">Language by {0} (Version: {1})</str>
+	</group>
+
+	<group name="ControllerOptions" prefix="ControllerOptions.">
+		<str id="bindings-name">Controller Bindings</str>
+		<str id="bindings-desc">Rebind notes, menu and engine controls to any button, trigger or stick direction. Each control has two slots.</str>
+
+		<str id="deadZone-name">Stick Dead Zone</str>
+		<str id="deadZone-desc">How far (in percent) a stick must be pushed before it counts as a press. Raise it if your sticks drift.</str>
+
+		<str id="resetBindings-name">Reset Controller Settings</str>
+		<str id="resetBindings-desc">Restore the default bindings (D-pad or Y/B/X/A for notes, A to confirm, B to go back) and dead zone.</str>
+		<str id="resetBindings-done">Controller settings reset to defaults.</str>
 	</group>
 
 	<group name="MiscOptions" prefix="MiscOptions.">

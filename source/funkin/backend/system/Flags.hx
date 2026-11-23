@@ -62,10 +62,16 @@ class Flags {
 	@:lazy public static var TITLE:String = Application.current.meta.get('name');
 	@:lazy public static var VERSION:String = Application.current.meta.get('version');
 
+	#if switch
+	/** Switchname Engine (the Nintendo Switch port) has its own version; VERSION stays Codename's for mod compatibility. */
+	public static var SWITCHNAME_VERSION:String = "1.0.0";
+	@:lazy public static var VERSION_MESSAGE:String = 'Switchname Engine v$SWITCHNAME_VERSION';
+	#else
 	@:lazy public static var VERSION_MESSAGE:String = 'Codename Engine v$VERSION';
+	#end
 
 	public static var REPO_NAME:String = "CodenameEngine";
-	public static var REPO_OWNER:String = "CodenameCrew";
+	public static var REPO_OWNER:String = "CodenameCrew"; // used for the credits menu: keep crediting Codename Crew
 	public static var REPO_URL:String = 'https://github.com/$REPO_OWNER/$REPO_NAME';
 
 	@:lazy public static var PATHS_CASE_SENSITIVE_FIX:Null<Bool> = null;
@@ -168,6 +174,12 @@ class Flags {
 
 	public static var USE_LEGACY_CENTER_CAM:Null<Bool> = null;
 	public static var USE_LEGACY_FLXANIMATE_STAGE_MATRIX:Null<Bool> = null;
+	/**
+	 * Draw texture atlases like the old `cne-flxanimate` renderer (Codename before flixel-animate):
+	 * stage matrix first, origin from the atlas' first sprite, no animation offsets or angle, 0x0 hitbox.
+	 * Defaults to true for mods made for mod API 1, so their atlas characters keep their authored positions.
+	 */
+	public static var USE_LEGACY_FLXANIMATE_DRAW:Null<Bool> = null;
 
 	public static var CHANGE_WINDOW_TITLE_PLAYSTATE:Bool = true;
 
@@ -373,6 +385,7 @@ class Flags {
 		if (USE_FLXTRAIL_FRAMES == null) USE_FLXTRAIL_FRAMES = MOD_API_VERSION < 2;
 		if (USE_LEGACY_CENTER_CAM == null) USE_LEGACY_CENTER_CAM = MOD_API_VERSION < 3;
 		if (USE_LEGACY_FLXANIMATE_STAGE_MATRIX == null) USE_LEGACY_FLXANIMATE_STAGE_MATRIX = MOD_API_VERSION < 3;
+		if (USE_LEGACY_FLXANIMATE_DRAW == null) USE_LEGACY_FLXANIMATE_DRAW = MOD_API_VERSION < 2;
 
 		flixel.sound.FlxSound.defaultTimeScaledPitch = cast DEFAULT_SOUND_TIME_SCALED_PITCH;
 		flixel.addons.effects.FlxTrail.defaultDelayBackwardCompatibility = cast USE_FLXTRAIL_FRAMES;

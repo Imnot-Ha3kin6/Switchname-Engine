@@ -20,6 +20,9 @@ final class Logs {
 
 	public static var nativeTrace = Log.trace;
 	public static function init() {
+		#if switch
+		try sys.io.File.saveContent("sdmc:/switch/cne-trace.log", "") catch(_:Dynamic) {}
+		#end
 		Log.trace = function(v:Dynamic, ?infos:Null<haxe.PosInfos>) {
 			var data = [
 				logText('${infos.fileName}:${infos.lineNumber}: ', CYAN, TRACE),
@@ -115,6 +118,15 @@ final class Logs {
 	}
 
 	public static function __showInConsole(text:Array<LogText>) {
+		#if switch
+		// No console on Switch: mirror every log line to the SD card.
+		try {
+			var out = sys.io.File.append("sdmc:/switch/cne-trace.log", false);
+			out.writeString([for(t in text) t.text].join("") + "
+");
+			out.close();
+		} catch(_:Dynamic) {}
+		#end
 		#if (sys && !mobile)
 		while(__showing) {
 			Sys.sleep(0.05);

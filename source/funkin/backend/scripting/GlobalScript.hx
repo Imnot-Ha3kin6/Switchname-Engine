@@ -17,6 +17,45 @@ class GlobalScript {
 	private static var reloading:Bool = false;
 	private static var _lastAllow_Reload:Bool = false;
 
+	/** Custom screens a mod used in place of a built-in menu (screen name -> menu class), learned while its custom menus are off. */
+	static var replacedMenus:Map<String, Class<FlxState>> = [];
+
+	/** True when the current mod's custom menus are turned off (Options.modsWithoutCustomMenus). */
+	public static function customMenusDisabled():Bool
+		return ModsFolder.currentModFolder != null && funkin.options.Options.modsWithoutCustomMenus.contains(ModsFolder.currentModFolder);
+
+	static function isMenuState(state:Dynamic):Bool {
+		if (state == null || !Std.isOfType(state, FlxState)) return false;
+		var name = Type.getClassName(Type.getClass(state));
+		return StringTools.startsWith(name, "funkin.menus.") || name == "funkin.options.OptionsMenu";
+	}
+
+	static function customScreenName(state:Dynamic):String
+		return Std.isOfType(state, ModState) ? cast(state, ModState).scriptName : null;
+
+	/**
+	 * Undo a mod's menu takeover when its custom menus are off: keep the built-in menu that was
+	 * requested, and remember which custom screen replaced it so direct switches to that screen
+	 * later open the built-in menu instead.
+	 */
+	static function guardMenus(before:Dynamic, gameStart:Bool) {
+		if (!customMenusDisabled()) return;
+		var now:Dynamic = @:privateAccess FlxG.game._requestedState;
+		var custom = customScreenName(now);
+
+		if (now != before && custom != null && (gameStart || before == null || isMenuState(before))) {
+			// the mod swapped a built-in menu (or the startup screen) for its own screen
+			replacedMenus.set(custom, before != null ? cast Type.getClass(before) : funkin.menus.TitleState);
+			@:privateAccess FlxG.game._requestedState = cast before;
+			// the mod's custom transition goes with its custom screens; the default menus need the default one
+			funkin.backend.MusicBeatTransition.script = Flags.DEFAULT_TRANSITION_SCRIPT;
+			Logs.trace('Custom menus off for ${ModsFolder.currentModFolder}: kept the default menu instead of "$custom"', INFO);
+		} else if (custom != null && replacedMenus.exists(custom)) {
+			// the mod opened one of its menu screens directly (e.g. after a cutscene)
+			@:privateAccess FlxG.game._requestedState = cast Type.createInstance(replacedMenus.get(custom), []);
+		}
+	}
+
 	public static function init() {
 		if(initialized) return;
 		initialized = true;
@@ -43,7 +82,9 @@ class GlobalScript {
 			call("postGameReset");
 		});
 		FlxG.signals.postGameStart.add(function() {
+			var before:Dynamic = @:privateAccess FlxG.game._requestedState;
 			call("postGameStart");
+			guardMenus(before, true);
 		});
 		FlxG.signals.postStateSwitch.add(function() {
 			call("postStateSwitch");
@@ -69,13 +110,15 @@ class GlobalScript {
 			call("preStateCreate", [state]);
 		});
 		FlxG.signals.preStateSwitch.add(function() {
+			var before:Dynamic = @:privateAccess FlxG.game._requestedState;
 			call("preStateSwitch");
+			guardMenus(before, false);
 
 			if (Flags.PATHS_CACHE_RESET_ON_SWITCH_STATE) Paths.assetsTree.resetAssetPathCache();
 
 			var stateName = Type.getClassName(Type.getClass(@:privateAccess FlxG.game._requestedState));
 			stateName = stateName.substring(stateName.lastIndexOf(".") + 1);
-			if (Flags.MOD_REDIRECT_STATES.exists(stateName)) {
+			if (Flags.MOD_REDIRECT_STATES.exists(stateName) && !(customMenusDisabled() && isMenuState(@:privateAccess FlxG.game._requestedState))) {
 				@:privateAccess {
 					var classFromString = Type.resolveClass(Flags.MOD_REDIRECT_STATES.get(stateName));
 					if (classFromString != null) FlxG.game._requestedState = Type.createInstance(classFromString, []);

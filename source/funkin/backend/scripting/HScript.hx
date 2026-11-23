@@ -84,6 +84,42 @@ class HScript extends Script {
 		if(_importFailedCallback(cl, "source/") || _importFailedCallback(cl, "")) {
 			return true;
 		}
+		return _movedClassFallback(cl, asName);
+	}
+
+	/** Classes that older Codename versions (and some mods) imported from a different package. */
+	static final MOVED_CLASSES:Map<String, String> = [
+		"funkin.game.FunkinSprite" => "funkin.backend.FunkinSprite",
+		"funkin.ui.FunkinText" => "funkin.backend.FunkinText",
+		"funkin.game.FunkinText" => "funkin.backend.FunkinText",
+		"funkin.system.FunkinSprite" => "funkin.backend.FunkinSprite",
+		"flixel.camera.FlxCameraFollowStyle" => "flixel.FlxCameraFollowStyle",
+		"flixel.text.FlxText.FlxTextBorderStyle" => "flixel.text.FlxTextBorderStyle"
+	];
+
+	/**
+	 * Keeps old mods working when an import points at a class that has moved:
+	 * known renames are redirected, and an import whose class name is already available
+	 * to scripts by default (e.g. `FunkinSprite`) is accepted instead of stopping the script.
+	 */
+	private function _movedClassFallback(cl:Array<String>, ?asName:String):Bool {
+		var full = cl.join(".");
+		var name = (asName != null && asName.length > 0) ? asName : cl[cl.length - 1];
+		var target = MOVED_CLASSES.get(full);
+		if (target != null) {
+			var resolved:Dynamic = Type.resolveClass(target);
+			if (resolved == null) resolved = Type.resolveEnum(target);
+			if (resolved != null) {
+				interp.variables.set(name, resolved);
+				Logs.trace('[$fileName] import $full -> $target (moved in this engine version)', WARNING);
+				return true;
+			}
+		}
+		if (interp.variables.exists(cl[cl.length - 1])) {
+			if (name != cl[cl.length - 1]) interp.variables.set(name, interp.variables.get(cl[cl.length - 1]));
+			Logs.trace('[$fileName] import $full not found, using the built-in ${cl[cl.length - 1]}', WARNING);
+			return true;
+		}
 		return false;
 	}
 	private function _importFailedCallback(cl:Array<String>, prefix:String):Bool {

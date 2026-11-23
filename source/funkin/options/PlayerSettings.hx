@@ -57,6 +57,13 @@ class  PlayerSettings
 			++numPlayers;
 		}
 
+		#if switch
+		// Controller bindings are user-configurable on Switch and are applied for
+		// any connected controller by Options.applyKeybinds() -> GamepadBinds.apply().
+		GamepadBinds.apply();
+		return;
+		#end
+
 		var numGamepads = FlxG.gamepads.numActiveGamepads;
 		if (numGamepads > 0)
 		{
