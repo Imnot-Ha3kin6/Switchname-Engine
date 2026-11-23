@@ -5,6 +5,9 @@
 > [!IMPORTANT]
 > Switchname Engine is a **sub-engine of Codename Engine**. Almost everything here is the work of the [Codename Crew](https://github.com/CodenameCrew) and the [Codename Engine contributors](https://github.com/CodenameCrew/CodenameEngine/graphs/contributors). This repository adds the Switch port on top. Please support the original project: [codename-engine.com](https://codename-engine.com/).
 
+> [!WARNING]
+> **Switchname Engine is in beta.** It's brand new, so expect bugs. Expect crashes with **heavy mods**: big modpacks with lots of shaders, huge sprite sheets, videos or many character swaps. The Switch has much less memory and GPU power than a PC. Lighter mods usually run fine. If something breaks, try the OpenGL build, then [open an issue](https://github.com/Imnot-Ha3kin6/Switchname-Engine/issues) with `sdmc:/switch/cne-trace.log`, `sdmc:/switch/dkgl.log` and any crash report from `sdmc:/atmosphere/crash_reports/`.
+
 > [!NOTE]
 > This is unofficial homebrew. It needs a Switch running custom firmware (Atmosphère). It is not affiliated with or endorsed by Nintendo, the Funkin' Crew or the Codename Crew.
 
