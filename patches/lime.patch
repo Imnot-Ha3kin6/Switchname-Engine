@@ -416,7 +416,7 @@ index 68182f1..39276e0 100644
  		return __applicationStorageDirectory;
 diff --git a/templates/switch/MakeFileNRO b/templates/switch/MakeFileNRO
 new file mode 100644
-index 0000000..e94dabf
+index 0000000..0131e55
 --- /dev/null
 +++ b/templates/switch/MakeFileNRO
 @@ -0,0 +1,219 @@
@@ -443,7 +443,7 @@ index 0000000..e94dabf
 +ROMFS		:=	[LIME_APPLICATION_DIR]
 +
 +APP_TITLE     := [LIME_PROJECT_TITLE]
-+APP_AUTHOR    := [LIME_PROJECT_AUTHOR]
++APP_AUTHOR    := $(if $(CNE_APP_AUTHOR),$(CNE_APP_AUTHOR),[LIME_PROJECT_AUTHOR])
 +# CNE_APP_VERSION (set by the project) overrides the version shown in the homebrew menu
 +APP_VERSION   := $(if $(CNE_APP_VERSION),$(CNE_APP_VERSION),[LIME_PROJECT_VERSION])
 +

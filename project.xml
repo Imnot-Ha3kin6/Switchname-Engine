@@ -105,6 +105,7 @@
 	<app title="Switchname Engine (OpenGL)" file="SwitchnameEngine-GL" company="Switchname Engine" if="switch"/>
 	<app title="Switchname Engine" file="SwitchnameEngine" if="switch_deko3d"/>
 	<setenv name="CNE_APP_VERSION" value="1.0.0" if="switch"/> <!-- keep in step with Flags.SWITCHNAME_VERSION -->
+	<setenv name="CNE_APP_AUTHOR" value="ImNot_Ha3kin6" if="switch"/>
 
 	<!--Switch Export with Unique ApplicationID and Icon-->
 	<set name="APP_ID" value="0x0100f6c013bbc000"/>
